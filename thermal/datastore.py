@@ -80,9 +80,15 @@ class DataStoreClient:
 
     # -- search ------------------------------------------------------------------------------
     def search(self, collection_id: str, start: datetime, end: datetime, **extra) -> list[Any]:
+        """Products in [start, end], in search order (newest first). Reading a product's
+        metadata properties may cost one request each, so callers keep windows small."""
         coll = self.datastore.get_collection(collection_id)
-        results = coll.search(dtstart=start, dtend=end, **extra)
-        return sorted(results, key=lambda p: p.sensing_start)
+        return list(coll.search(dtstart=start, dtend=end, **extra))
+
+    @staticmethod
+    def platform_from_id(product: Any) -> str:
+        """Platform short name from the product id, e.g. MSG3-SEVI-... -> MSG3 (no request)."""
+        return str(product).split("-", 1)[0]
 
     def product_at(self, collection_id: str, t: datetime, cadence_minutes: int, platform=None):
         """Product whose nominal time is t, searching +-tolerance around it."""

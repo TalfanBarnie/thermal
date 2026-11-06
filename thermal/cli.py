@@ -106,8 +106,8 @@ def cmd_platforms(args) -> int:
     rows = []
     while t < end:
         try:
-            products = client.search(sat["collection"], t, t + timedelta(hours=2))
-            platforms = sorted({p.satellite for p in products})
+            products = client.search(sat["collection"], t, t + timedelta(hours=1))
+            platforms = sorted({client.platform_from_id(p) for p in products})
         except Exception as exc:
             platforms = [f"error: {exc}"]
         rows.append((t.date().isoformat(), ",".join(platforms) or "none"))
