@@ -530,7 +530,31 @@ slice ran in date order; later slices run in a fixed shuffled order).
   noise floor at night against the instrument NEdT, and add the spatial
   mean-residual map and histogram figures to the report.
 
-## 16. Remaining items to verify
+## 16. Milestone M4 status (2026-11-06)
+
+- `thermal/products.py`: per timestamp, `residual.npz` (residual, z-score,
+  predicted std, flags, lat, lon) in the private bucket and fixed-scale PNGs
+  (ir39, ir39_pred, residual, zscore, ir108, vis06 by day only, clm) in the
+  public bucket under `products/<sat>/<Y>/<M>/<D>/<stamp>/`. Flags: 1 invalid,
+  2 saturated IR3.9 (radiance at count 1023 from the `chNN_cal` attribute),
+  4 cloud, 8 cloud mask unavailable.
+- `thermal/timeseries.py`: one row per region and timestamp with `sum_pos`,
+  `max`, `max_z`, `n_above` (z > 4), `mean`, `vrp_w` (MIR method with the
+  per-wavenumber to per-micron conversion, **[verify]** the constant and
+  units), `n_sat`, `n_cloud`, `n_cloud_unknown`, `sza_mean`, platform and
+  model id; monthly `.jsonl` shards in the public bucket updated by
+  read-modify-write; `index.json` listing sources, regions and months.
+- `thermal/live.py`: `process_timestamp` (fetch or reuse, model, products,
+  rows) and `run_live` (candidates since the stored state, bounded by a
+  lookback and a maximum count; nominal times are parsed from product ids so
+  no per-product requests are made; state and index updated after each).
+- Workflows: `live` (hourly cron, concurrency group, manual dispatch) and
+  `process one timestamp`.
+- Models are loaded per platform from `models/<sat>/<platform>/latest.json`;
+  a timestamp whose platform has no model is recorded as an error and left
+  for a later run.
+
+## 17. Remaining items to verify
 
 - Exact handover times in `data/platform_history.csv` (the backfill records
   the platform of every fetched product, which will confirm them).
