@@ -102,6 +102,6 @@ def test_candidate_window_respects_min_age(monkeypatch):
             return [P(e) for e in ends]
 
     sat = {"collection": "c", "cadence_minutes": 15}
-    got = live.candidate_times(C(), sat, now - timedelta(hours=3), now - timedelta(minutes=75))
+    got = live.candidate_times(C(), sat, now - timedelta(hours=4), now - timedelta(minutes=75))
     assert all(t <= now - timedelta(minutes=75) for t in got)
     assert len(got) == 3
