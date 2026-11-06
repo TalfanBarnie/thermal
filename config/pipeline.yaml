@@ -1,0 +1,8 @@
+datatailor:
+  format: netcdf4
+  poll_seconds: 15
+  timeout_seconds: 1800
+  max_concurrent: 2
+search:
+  # half-width of the sensing-time window used when looking up a product at a nominal time
+  tolerance_minutes: 20

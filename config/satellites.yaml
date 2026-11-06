@@ -1,0 +1,43 @@
+# One entry per satellite key (<platform>-<slot>). Each key gets its own background model.
+# Fields marked verify are to be confirmed against the Data Store during milestone M1.
+msg11-0deg:
+  description: Meteosat-11 (MSG4) SEVIRI, 0 degree full disk service
+  platform: MSG4                      # Data Store "satellite" property, verify
+  instrument: SEVIRI
+  collection: EO:EUM:DAT:MSG:HRSEVIRI
+  cloudmask_collection: EO:EUM:DAT:MSG:CLM
+  tailor_product: HRSEVIRI            # Data Tailor product type, verify
+  tailor_cloudmask_product: MSGCLMK   # verify
+  sub_lon: 0.0
+  cadence_minutes: 15
+  mir_channel: IR_039
+  channels: [VIS006, VIS008, IR_016, IR_039, WV_062, WV_073, IR_087, IR_097, IR_108, IR_120]
+  monitoring_regions: [reykjanes]
+
+msg10-rss:
+  description: Meteosat-10 (MSG3) SEVIRI, rapid scan service from 9.5E
+  platform: MSG3                      # verify
+  instrument: SEVIRI
+  collection: EO:EUM:DAT:MSG:MSG15-RSS
+  cloudmask_collection: EO:EUM:DAT:MSG:RSS-CLM
+  tailor_product: HRSEVIRI            # verify
+  tailor_cloudmask_product: MSGCLMK   # verify
+  sub_lon: 9.5
+  cadence_minutes: 5
+  mir_channel: IR_039
+  channels: [VIS006, VIS008, IR_016, IR_039, WV_062, WV_073, IR_087, IR_097, IR_108, IR_120]
+  monitoring_regions: [reykjanes]
+
+mtgi1-0deg:
+  description: MTG-I1 (Meteosat-12) FCI, 0 degree full disk, FDHSI
+  platform: MTI1                      # verify
+  instrument: FCI
+  collection: EO:EUM:DAT:0662         # verify
+  cloudmask_collection: null          # verify
+  tailor_product: FCIL1FDHSI          # verify
+  tailor_cloudmask_product: null
+  sub_lon: 0.0
+  cadence_minutes: 10
+  mir_channel: ir_38
+  channels: [vis_04, vis_05, vis_06, vis_08, vis_09, nir_13, nir_16, nir_22, ir_38, wv_63, wv_73, ir_87, ir_97, ir_105, ir_123, ir_133]
+  monitoring_regions: [reykjanes]

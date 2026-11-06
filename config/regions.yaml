@@ -1,0 +1,21 @@
+# All coordinates WGS84 decimal degrees. Polygons are [lon, lat] vertex lists.
+
+# Fetch, training and inference region: Iceland bounding box buffered ~20 km.
+iceland_box:
+  north: 66.8
+  south: 63.1
+  west: -25.0
+  east: -13.0
+
+# Monitoring regions: residual statistics are aggregated over these per timestamp.
+# The polygon should include the ground projection of the plume stack, which
+# extends from the vent towards the sub-satellite point (about SSE for the 0 deg slot).
+# Initial guesses, to be tuned by inspecting residual images from a known eruption.
+monitoring:
+  reykjanes:
+    description: Reykjanes peninsula and sea to the SSE (plume projection for 0 deg slot)
+    polygon:
+      - [-22.95, 64.10]
+      - [-21.40, 64.10]
+      - [-21.10, 63.55]
+      - [-22.60, 63.45]
