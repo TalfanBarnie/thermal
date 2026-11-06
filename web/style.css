@@ -1,0 +1,57 @@
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --series: #2a78d6; --night: rgba(11,11,11,0.06); --erupt: rgba(236,131,90,0.22); --erupt-ink: #ec835a;
+  --sat: #d03b3b; --cloud: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --series: #3987e5; --night: rgba(255,255,255,0.06); --erupt: rgba(236,131,90,0.25);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --series: #3987e5; --night: rgba(255,255,255,0.06); --erupt: rgba(236,131,90,0.25);
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; background: var(--page); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 1200px; margin-inline: auto; }
+h1 { font-size: 22px; margin: 0; } h2 { font-size: 16px; margin: 0; } h3.small { font-size: 13px; color: var(--ink-2); margin: 12px 0 4px; font-weight: 600; }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 12px; }
+.top .sub { margin: 0; color: var(--ink-2); flex: 1 1 400px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; margin-bottom: 12px; }
+.filters label { display: flex; flex-direction: column; font-size: 12px; color: var(--ink-2); gap: 2px; }
+select, button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+button.ghost { cursor: pointer; } button.ghost:hover { background: var(--night); }
+.status { color: var(--muted); font-size: 13px; align-self: center; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; position: relative; }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.key { display: flex; gap: 12px; font-size: 12px; color: var(--ink-2); }
+.k::before { content: ""; display: inline-block; width: 14px; height: 10px; margin-right: 4px; vertical-align: -1px; border-radius: 2px; }
+.k-night::before { background: var(--night); border: 1px solid var(--axis); }
+.k-erupt::before { background: var(--erupt); border: 1px solid var(--erupt-ink); }
+.k-sat { color: var(--sat); } .k-sat::before { display: none; }
+.chart { width: 100%; height: 320px; } .chart-small { height: 110px; }
+.uplot .u-legend { display: none; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); z-index: 5; min-width: 140px; }
+.tip .v { font-weight: 700; font-size: 14px; } .tip .l { color: var(--ink-2); }
+.tip .row { display: flex; justify-content: space-between; gap: 12px; }
+.nav { display: flex; gap: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+.grid figure { margin: 0; } .grid img { width: 100%; height: auto; image-rendering: pixelated; border-radius: 4px; border: 1px solid var(--border); background: #3c3c3c; }
+.grid figcaption { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.muted { color: var(--ink-2); } .tiny { font-size: 12px; }
+.table-wrap { overflow-x: auto; max-height: 360px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+tbody tr { cursor: pointer; } tbody tr:hover { background: var(--night); }
+a { color: var(--series); }
+@media (max-width: 600px) { body { padding: 16px 16px; } .chart { height: 240px; } }

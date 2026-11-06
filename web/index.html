@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iceland thermal anomalies</title>
+<meta name="description" content="Volcanic thermal anomaly time series over Iceland from Meteosat imagery, with per-image residual maps.">
+<link rel="stylesheet" href="vendor/uPlot.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>Iceland thermal anomalies</h1>
+  <p class="sub">Observed minus modelled 3.9&nbsp;µm radiance from Meteosat SEVIRI, summarised over a monitoring region. Click a point to see the images for that time.</p>
+  <button id="theme" class="ghost" type="button" aria-label="Toggle dark mode">Theme</button>
+</header>
+
+<section class="filters" aria-label="Filters">
+  <label>Range
+    <select id="range">
+      <option value="7">Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last year</option>
+      <option value="all" selected>All</option>
+    </select>
+  </label>
+  <label>Source <select id="source"></select></label>
+  <label>Region <select id="region"></select></label>
+  <label>Statistic
+    <select id="stat">
+      <option value="sum_pos">Summed positive residual</option>
+      <option value="max">Maximum residual</option>
+      <option value="max_z">Maximum z-score</option>
+      <option value="n_above">Pixels above z = 4</option>
+      <option value="vrp_w">Radiative power (MIR method)</option>
+      <option value="mean">Mean residual</option>
+    </select>
+  </label>
+  <span id="status" class="status" role="status"></span>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2 id="chart-title">Summed positive residual</h2>
+    <div class="key" aria-label="Key">
+      <span class="k k-night">night</span>
+      <span class="k k-erupt">eruption (calendar)</span>
+      <span class="k k-sat">▲ saturated pixels</span>
+    </div>
+  </div>
+  <div id="chart" class="chart"></div>
+  <h3 class="small">Cloud fraction in region</h3>
+  <div id="cloud" class="chart chart-small"></div>
+  <div id="tip" class="tip" hidden></div>
+</section>
+
+<section class="card" id="images" hidden>
+  <div class="card-head">
+    <h2 id="img-title">Images</h2>
+    <div class="nav">
+      <button id="prev" class="ghost" type="button">← Previous</button>
+      <button id="next" class="ghost" type="button">Next →</button>
+    </div>
+  </div>
+  <p id="img-stats" class="muted"></p>
+  <div class="grid" id="img-grid"></div>
+  <p class="muted tiny">Images are colour-mapped quicklooks: residual −0.05 to 0.30 and z-score −5 to 20 on a fixed scale; IR3.9 and IR10.8 radiance on fixed scales; cloud mask black = clear sea, grey = clear land, white = cloud. North is up; the parallelogram is the Iceland box seen from the satellite. Imagery © EUMETSAT, derived products via this project.</p>
+</section>
+
+<section class="card">
+  <details>
+    <summary>Table view</summary>
+    <div class="table-wrap"><table id="table"><thead><tr>
+      <th>Time (UTC)</th><th>Summed positive</th><th>Max</th><th>Max z</th><th>n &gt; 4</th><th>Power (W)</th><th>Cloud</th><th>Saturated</th><th>SZA</th>
+    </tr></thead><tbody></tbody></table></div>
+  </details>
+</section>
+
+<footer class="muted tiny">Source: EUMETSAT Data Store via the Data Tailor; background model and products from the <a href="https://github.com/TalfanBarnie/thermal">thermal</a> repository.</footer>
+
+<script src="vendor/uPlot.iife.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

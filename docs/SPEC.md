@@ -572,7 +572,30 @@ slice ran in date order; later slices run in a fixed shuffled order).
   newer model (needed after every retrain and for the eruption backfill),
   and the parquet compaction of the shards for analysis.
 
-## 17. Remaining items to verify
+## 17. Milestone M5 status (2026-11-06)
+
+- `web/`: `index.html`, `app.js`, `style.css`, `config.js` and a vendored
+  uPlot 1.6.30 (MIT) so the page has no third-party runtime dependency. No
+  build step.
+- Reads `index.json`, the monthly shards of the chosen source and region, and
+  `data/eruptions.csv` (copied into the site at deploy). Filters in one row:
+  range presets, source, region, statistic. One axis per chart: the chosen
+  statistic above, cloud fraction below, cursors synced. Night shading from
+  the mean solar zenith, eruption bands from the calendar, saturated samples
+  marked, crosshair tooltip with every value, a table view, lines and bands
+  broken at data gaps longer than 3 hours, URL hash state, selected light
+  and dark themes with a toggle, phone layout without horizontal scroll.
+- Clicking a point (or a table row, or arrow keys) shows the product PNGs
+  for that time with previous/next navigation; the visible image is omitted
+  at night.
+- `pages` workflow publishes `web/` to GitHub Pages, writing `config.js`
+  from the `B2_PUBLIC_URL` variable. It needs Pages enabled with source
+  "GitHub Actions" in the repository settings and runs on pushes to the
+  default branch or on dispatch.
+- Verified locally in headless Chromium against the live bucket at desktop
+  and phone widths in both themes: no console errors, no overflow.
+
+## 18. Remaining items to verify
 
 - Exact handover times in `data/platform_history.csv` (the backfill records
   the platform of every fetched product, which will confirm them).
