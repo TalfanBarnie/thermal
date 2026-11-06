@@ -1,0 +1,6 @@
+source,platform,start_date,end_date,reference,notes
+msg-0deg,MSG1,2004-01-19,2007-04-11,EUMETSAT prime satellites log (pdf_meteosat_prime_satellites.pdf),Meteosat-8; MSG2 covered Sep-Oct 2006 after a fault; end date approximate (April 2007)
+msg-0deg,MSG2,2007-04-11,2013-01-21,EUMETSAT prime satellites log; eumetsat.int/meteosat-10-takes-over-meteosat-9,Meteosat-9; start date approximate (April 2007)
+msg-0deg,MSG3,2013-01-21,2018-02-20,eumetsat.int/meteosat-10-takes-over-meteosat-9; NOAA OSPO MSG0471704,Meteosat-10 first period
+msg-0deg,MSG4,2018-02-20,2023-03-21,NOAA OSPO MSG0471704 (0900 UTC); OSI SAF service message 2581,Meteosat-11
+msg-0deg,MSG3,2023-03-21,,OSI SAF service message 2581 (swap 21 March 2023 ~1400 UTC); NOAA OSPO 2026/04 notices,Meteosat-10 second period; short MSG4 cover in Nov 2025 and Apr 2026; MTG-I1 is prime imager since 2025 but the MSG 0 deg service continues

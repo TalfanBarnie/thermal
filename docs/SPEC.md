@@ -481,10 +481,30 @@ eruption in progress). Resolved items:
   62% finite), consistent with a satellite zenith angle limit in the cloud
   mask product. Class 3 / no data is encoded as NaN.
 
-## 14. Remaining items to verify
+## 14. Milestone M2 findings (2026-11-06)
 
-- Slot history: which platform served 0° on which dates across the archive
-  (read from product metadata as data is fetched; keep a table).
+- **Platform history** of the 0° slot (from EUMETSAT, OSI SAF and NOAA
+  notices; `data/platform_history.csv`): Meteosat-8 2004 to 2007, Meteosat-9
+  2007 to 21 Jan 2013, Meteosat-10 to 20 Feb 2018, Meteosat-11 to 21 Mar
+  2023, Meteosat-10 since. Fagradalsfjall 2021 and 2022 were imaged by
+  Meteosat-11 (`msg-0deg/MSG4`); Litli-Hrútur 2023 and every Sundhnúkur
+  eruption by Meteosat-10 (`msg-0deg/MSG3`). Two models cover the validation
+  eruptions.
+- **Training samples** (`data/samples/`): 1000 timestamps each for the
+  MSG3 era (2023-03-22 onwards) and the MSG4 era (2018-02-21 to
+  2023-03-20), stratified over month and hour, eruption windows excluded
+  with the 30 day buffer. The 2013 to 2018 Meteosat-10 era is a reserve
+  source of extra MSG3 training data if needed.
+- **Data Tailor throughput**: ~2.5 min per timestamp (image plus cloud
+  mask) sequentially; the backfill workflow runs 2 customisations at a time
+  in 330 minute slices and resumes from state in the private bucket.
+- **Eruption calendar**: `data/eruptions.csv`, 18 rows, from the GVP web
+  service and Wikipedia wikitext via `scripts/scrape_eruptions.py`.
+
+## 15. Remaining items to verify
+
+- Exact handover times in `data/platform_history.csv` (the backfill records
+  the platform of every fetched product, which will confirm them).
 - RSS and FCI collection ids and Data Tailor product types.
 - Saturation handling and flagging in the level 1.5 cutout.
 - Cloud mask value semantics, in particular how no-data is encoded.
