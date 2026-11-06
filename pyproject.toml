@@ -29,7 +29,7 @@ analysis = ["cmdstanpy", "pandas", "pyarrow", "matplotlib"]
 thermal = "thermal.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["thermal*"]
+include = ["thermal*", "training*"]
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,68 @@
+name: train
+# Trains the ridge and MLP background models on the cutouts fetched so far for a platform,
+# evaluates them on held-out days, stores artefacts and a report in the private bucket, and
+# runs the model on a known eruption timestamp as a detection check.
+on:
+  workflow_dispatch:
+    inputs:
+      sat:
+        default: msg-0deg
+      platform:
+        description: platform whose cutouts to train on (MSG3, MSG4, ...)
+        default: MSG3
+      list:
+        description: sample CSV (only timestamps already fetched are used)
+        default: data/samples/msg-0deg_msg3_train.csv
+      models:
+        default: ridge,mlp
+      epochs:
+        default: "30"
+      max_images:
+        description: 0 = all available
+        default: "0"
+      check_time:
+        description: eruption timestamp for the detection check (empty to skip)
+        default: "2024-03-16T22:00:00Z"
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      EUMETSAT_CONSUMER_KEY: ${{ secrets.EUMETSAT_CONSUMER_KEY }}
+      EUMETSAT_CONSUMER_SECRET: ${{ secrets.EUMETSAT_CONSUMER_SECRET }}
+      B2_PRIVATE_KEY_ID: ${{ secrets.B2_PRIVATE_KEY_ID }}
+      B2_PRIVATE_APPLICATION_KEY: ${{ secrets.B2_PRIVATE_APPLICATION_KEY }}
+      B2_PUBLIC_KEY_ID: ${{ secrets.B2_PUBLIC_KEY_ID }}
+      B2_PUBLIC_APPLICATION_KEY: ${{ secrets.B2_PUBLIC_APPLICATION_KEY }}
+      B2_PRIVATE_BUCKET: ${{ vars.B2_PRIVATE_BUCKET }}
+      B2_PUBLIC_BUCKET: ${{ vars.B2_PUBLIC_BUCKET }}
+      B2_ENDPOINT: ${{ vars.B2_ENDPOINT }}
+      B2_PUBLIC_URL: ${{ vars.B2_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e . scikit-learn pandas
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: train and evaluate
+        run: >
+          python -m training.run --sat "${{ inputs.sat }}" --platform "${{ inputs.platform }}"
+          --list "${{ inputs.list }}" --models "${{ inputs.models }}" --epochs "${{ inputs.epochs }}"
+          --max-images "${{ inputs.max_images }}" --out "$RUNNER_TEMP/reports"
+      - name: detection check on a known eruption
+        if: ${{ inputs.check_time != '' }}
+        run: >
+          thermal predict --sat "${{ inputs.sat }}" --time "${{ inputs.check_time }}"
+          --platform "${{ inputs.platform }}" --out "$RUNNER_TEMP/predict"
+      - name: upload report and quicklooks (no numerical satellite data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: train-report
+          path: |
+            ${{ runner.temp }}/reports/**/report.json
+            ${{ runner.temp }}/predict/*.json
+            ${{ runner.temp }}/predict/quicklook/**/*.png
+          if-no-files-found: ignore

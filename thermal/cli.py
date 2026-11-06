@@ -10,6 +10,8 @@ import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
+
 from . import config, inspect, pipeline, sampling
 from .storage import Storage
 
@@ -88,6 +90,78 @@ def cmd_fetch(args) -> int:
     print(json.dumps(report, indent=1, default=str))
     print(f"report written to {report_path}")
     return 0 if report["ok"] else 1
+
+
+def cmd_predict(args) -> int:
+    """Apply the latest (or given) background model to one timestamp: residual images and stats."""
+    from . import anomaly, features, render
+    from .model import BackgroundModel
+    from .storage import quicklook_key
+
+    settings = config.load_settings()
+    sat = config.satellite(args.sat)
+    t = parse_time(args.time)
+    storage = Storage(settings)
+    out_dir = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix="thermal-"))
+    report = pipeline.fetch_timestamp(_client(settings), storage, sat, t, out_dir, summarise=False)
+    if not report["ok"]:
+        print(json.dumps(report, indent=1, default=str))
+        return 1
+    l15 = out_dir / "l15" / raw_key_name(sat["key"], t, "l15")
+    fs = features.build_features(l15, t, sat)
+    platform = args.platform or fs.platform
+    if args.model:
+        model_path = Path(args.model)
+    else:
+        pointer = storage.private.get_json(f"models/{sat['key']}/{platform}/latest.json")
+        if not pointer:
+            raise SystemExit(f"no model for {sat['key']}/{platform}")
+        model_path = out_dir / "model.npz"
+        storage.private.get_file(pointer["key"], model_path)
+    model = BackgroundModel.load(model_path)
+    images = anomaly.predict_images(model, fs)
+    cloud = None
+    clm = out_dir / "clm" / raw_key_name(sat["key"], t, "clm")
+    if clm.exists():
+        import xarray as xr
+
+        with xr.open_dataset(clm, decode_times=False) as ds:
+            cloud = np.asarray(ds[sat.get("cloudmask_variable", "cloud_mask")].values, dtype=float)
+    stats = [
+        anomaly.region_stats(images, fs, r, cloud_mask=cloud) for r in anomaly.default_regions(sat)
+    ]
+    result = {
+        "sat": sat["key"],
+        "time": t.isoformat(),
+        "platform": fs.platform,
+        "model": model.meta.get("model_type"),
+        "model_path": str(model_path),
+        "regions": stats,
+        "quicklooks": {},
+    }
+    ql_dir = out_dir / "quicklook" / "predict"
+    scales = {"residual": (-0.05, 0.3), "zscore": (-5, 20), "observed": None, "predicted": None}
+    for name, (vmin, vmax) in ((k, v if v else (None, None)) for k, v in scales.items()):
+        img = images[name]
+        arr = img[::-1] if np.nanmean(fs.lat[0]) < np.nanmean(fs.lat[-1]) else img
+        path = ql_dir / f"{name}.png"
+        lo, hi = render.to_png(arr, path, vmin=vmin, vmax=vmax)
+        result["quicklooks"][name] = {"path": str(path), "vmin": lo, "vmax": hi}
+        if not args.no_upload:
+            key = quicklook_key(sat["key"], t, "predict", name)
+            storage.public.put_file(key, path, content_type="image/png")
+            result["quicklooks"][name]["public_url"] = storage.public_url_for(key)
+    print(json.dumps(result, indent=1, default=str))
+    (out_dir / f"predict_{sat['key']}_{t:%Y%m%dT%H%M%S}.json").write_text(
+        json.dumps(result, indent=1, default=str)
+    )
+    return 0
+
+
+def raw_key_name(sat_key: str, t: datetime, kind: str) -> str:
+    from .storage import raw_key
+
+    return raw_key(sat_key, t, kind).rsplit("/", 1)[-1]
 
 
 def cmd_inspect(args) -> int:
@@ -190,6 +264,15 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--force", action="store_true", help="re-run the Data Tailor even if stored")
     f.add_argument("--quicklook", action="store_true", help="render PNG quicklooks")
     f.set_defaults(func=cmd_fetch)
+
+    pr = sub.add_parser("predict", help="apply the background model to one timestamp")
+    pr.add_argument("--sat", default="msg-0deg")
+    pr.add_argument("--time", required=True)
+    pr.add_argument("--platform", help="model platform (default: the cutout's platform)")
+    pr.add_argument("--model", help="local .npz instead of the bucket's latest model")
+    pr.add_argument("--out")
+    pr.add_argument("--no-upload", action="store_true")
+    pr.set_defaults(func=cmd_predict)
 
     i = sub.add_parser("inspect", help="summarise local cutout files")
     i.add_argument("files", nargs="+")

@@ -1,0 +1,27 @@
+# SEVIRI radiance -> brightness temperature conversion: T = (C2*nu_c / ln(1 + C1*nu_c^3 / R) - B) / A
+# with R in mW m-2 sr-1 (cm-1)-1. Coefficients from the EUMETSAT document "The Conversion from
+# Effective Radiances to Equivalent Brightness Temperatures" (EUM/MET/TEN/11/0569), from memory:
+# verify against the document before using brightness temperatures quantitatively. They are only
+# used as model input features and for reporting residuals in kelvin.
+constants:
+  C1: 1.19104e-5
+  C2: 1.43877
+platforms:
+  MSG3:
+    IR_039: {nu_c: 2547.771, A: 0.9915, B: 2.9002}
+    WV_062: {nu_c: 1595.621, A: 0.9960, B: 2.0337}
+    WV_073: {nu_c: 1360.337, A: 0.9991, B: 0.4340}
+    IR_087: {nu_c: 1148.130, A: 0.9996, B: 0.1714}
+    IR_097: {nu_c: 1034.715, A: 0.9999, B: 0.0527}
+    IR_108: {nu_c: 931.700, A: 0.9983, B: 0.6256}
+    IR_120: {nu_c: 836.138, A: 0.9988, B: 0.4002}
+    IR_134: {nu_c: 751.273, A: 0.9981, B: 0.5635}
+  MSG4:
+    IR_039: {nu_c: 2555.280, A: 0.9916, B: 2.9438}
+    WV_062: {nu_c: 1596.080, A: 0.9959, B: 2.0780}
+    WV_073: {nu_c: 1361.748, A: 0.9990, B: 0.4929}
+    IR_087: {nu_c: 1147.433, A: 0.9996, B: 0.1731}
+    IR_097: {nu_c: 1034.851, A: 0.9998, B: 0.0597}
+    IR_108: {nu_c: 931.122, A: 0.9983, B: 0.6256}
+    IR_120: {nu_c: 839.113, A: 0.9988, B: 0.4002}
+    IR_134: {nu_c: 748.585, A: 0.9981, B: 0.5635}
