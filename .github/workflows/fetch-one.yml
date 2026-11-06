@@ -38,11 +38,13 @@ jobs:
       - run: pip install -e .
       - run: >
           thermal -v fetch --sat "${{ inputs.sat }}" --time "${{ inputs.time }}"
-          --out "$RUNNER_TEMP/fetch" ${{ inputs.upload == false && '--no-upload' || '' }}
-      - name: upload metadata report (no satellite data)
+          --out "$RUNNER_TEMP/fetch" --quicklook ${{ inputs.upload == false && '--no-upload' || '' }}
+      - name: upload metadata report and quicklooks (no numerical satellite data)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fetch-report
-          path: ${{ runner.temp }}/fetch/*.json
+          path: |
+            ${{ runner.temp }}/fetch/*.json
+            ${{ runner.temp }}/fetch/quicklook/**/*.png
           if-no-files-found: ignore

@@ -14,7 +14,12 @@ msg-0deg:
   sub_lon: 0.0
   cadence_minutes: 15
   mir_channel: IR_039
-  channels: [VIS006, VIS008, IR_016, IR_039, WV_062, WV_073, IR_087, IR_097, IR_108, IR_120]
+  channels: [VIS006, VIS008, IR_016, IR_039, WV_062, WV_073, IR_087, IR_097, IR_108, IR_120, IR_134]
+  # Data Tailor netCDF variable names -> channel names (SEVIRI band order; HRV is not included)
+  variable_map: {channel_1: VIS006, channel_2: VIS008, channel_3: IR_016, channel_4: IR_039,
+                 channel_5: WV_062, channel_6: WV_073, channel_7: IR_087, channel_8: IR_097,
+                 channel_9: IR_108, channel_10: IR_120, channel_11: IR_134}
+  cloudmask_variable: cloud_mask
   monitoring_regions: [reykjanes]
 
 msg-rss:
@@ -28,7 +33,11 @@ msg-rss:
   sub_lon: 9.5
   cadence_minutes: 5
   mir_channel: IR_039
-  channels: [VIS006, VIS008, IR_016, IR_039, WV_062, WV_073, IR_087, IR_097, IR_108, IR_120]
+  channels: [VIS006, VIS008, IR_016, IR_039, WV_062, WV_073, IR_087, IR_097, IR_108, IR_120, IR_134]
+  variable_map: {channel_1: VIS006, channel_2: VIS008, channel_3: IR_016, channel_4: IR_039,
+                 channel_5: WV_062, channel_6: WV_073, channel_7: IR_087, channel_8: IR_097,
+                 channel_9: IR_108, channel_10: IR_120, channel_11: IR_134}   # verify
+  cloudmask_variable: cloud_mask
   monitoring_regions: [reykjanes]
 
 mtg-0deg:

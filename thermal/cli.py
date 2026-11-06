@@ -10,8 +10,8 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import config, inspect, regions
-from .storage import Storage, fetch_report_key, raw_key
+from . import config, inspect, regions, render
+from .storage import Storage, fetch_report_key, quicklook_key, raw_key
 
 log = logging.getLogger("thermal")
 
@@ -93,28 +93,49 @@ def cmd_fetch(args) -> int:
         entry: dict = {"collection": coll_id, "tailor_product": tailor_product}
         report["products"][kind] = entry
         try:
-            product = client.product_at(
-                coll_id, t, sat["cadence_minutes"], platform=sat.get("platform_filter")
-            )
-            if product is None:
-                raise RuntimeError(f"no product found in {coll_id} near {t.isoformat()}")
-            entry["product"] = client.product_summary(product)
-            log.info("%s: using %s", kind, entry["product"])
-            result = client.tailor(product, tailor_product, roi, out_dir / kind)
-            entry["customisation"] = {
-                "id": result.customisation_id,
-                "duration_s": round(result.duration_s, 1),
-                "log": result.log,
-            }
-            entry["outputs"] = [inspect.summarise(p) for p in result.outputs]
-            if storage is not None:
+            key = raw_key(sat["key"], t, kind)
+            nc_path = None
+            if storage is not None and not args.force and storage.private.exists(key):
+                nc_path = out_dir / kind / key.rsplit("/", 1)[-1]
+                storage.private.get_file(key, nc_path)
+                entry["reused_key"] = key
+                log.info("%s: reusing existing cutout %s", kind, key)
+            else:
+                product = client.product_at(
+                    coll_id, t, sat["cadence_minutes"], platform=sat.get("platform_filter")
+                )
+                if product is None:
+                    raise RuntimeError(f"no product found in {coll_id} near {t.isoformat()}")
+                entry["product"] = client.product_summary(product)
+                log.info("%s: using %s", kind, entry["product"])
+                result = client.tailor(product, tailor_product, roi, out_dir / kind)
+                entry["customisation"] = {
+                    "id": result.customisation_id,
+                    "duration_s": round(result.duration_s, 1),
+                    "log": result.log,
+                }
                 nc = [p for p in result.outputs if p.suffix == ".nc"]
                 if not nc:
                     raise RuntimeError(f"no netCDF output among {[p.name for p in result.outputs]}")
-                key = raw_key(sat["key"], t, kind)
-                storage.private.put_file(key, nc[0], content_type="application/x-netcdf")
-                entry["stored_key"] = key
-                log.info("stored %s", key)
+                nc_path = nc[0]
+                if storage is not None:
+                    storage.private.put_file(key, nc_path, content_type="application/x-netcdf")
+                    entry["stored_key"] = key
+                    log.info("stored %s", key)
+            entry["summary"] = inspect.summarise(nc_path)
+            if args.quicklook:
+                variables = (
+                    list(sat.get("variable_map", {}))
+                    if kind == "l15"
+                    else [sat["cloudmask_variable"]]
+                )
+                ql = render.quicklooks(nc_path, out_dir / "quicklook" / kind, variables)
+                entry["quicklooks"] = ql
+                if storage is not None:
+                    for var, info in ql.items():
+                        qkey = quicklook_key(sat["key"], t, kind, var)
+                        storage.public.put_file(qkey, Path(info["path"]), content_type="image/png")
+                        info["public_url"] = storage.public_url_for(qkey)
         except Exception as exc:
             failures += 1
             entry["error"] = f"{type(exc).__name__}: {exc}"
@@ -151,6 +172,8 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--out", help="local output directory (default: temp dir)")
     f.add_argument("--no-upload", action="store_true", help="do not write to the private bucket")
     f.add_argument("--no-cloudmask", action="store_true")
+    f.add_argument("--force", action="store_true", help="re-run the Data Tailor even if stored")
+    f.add_argument("--quicklook", action="store_true", help="render PNG quicklooks")
     f.set_defaults(func=cmd_fetch)
 
     i = sub.add_parser("inspect", help="summarise local cutout files")

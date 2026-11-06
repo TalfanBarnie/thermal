@@ -29,6 +29,11 @@ def fetch_report_key(sat: str, t: datetime) -> str:
     return f"reports/fetch/{sat}/{time_stamp(t)}.json"
 
 
+def quicklook_key(sat: str, t: datetime, kind: str, variable: str) -> str:
+    """Public bucket key of a quicklook PNG (derived image, not numerical data)."""
+    return f"quicklooks/{sat}/{t:%Y/%m/%d}/{time_stamp(t)}/{kind}_{variable}.png"
+
+
 def state_key(sat: str) -> str:
     return f"state/{sat}.json"
 

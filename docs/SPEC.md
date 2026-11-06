@@ -434,13 +434,47 @@ radiance-to-effusion coefficient, and the cooling kernel.
 M1 is the first thing to build because it resolves most of the **[verify]**
 items.
 
-## 13. Open items to verify in M1
+## 13. Milestone M1 findings (2026-11-06)
 
-- Collection ids, platform names and slot history in the Data Store.
-- Data Tailor: native projection cutouts, output netCDF structure (do we get
-  lat/lon arrays or projection coordinates), quotas, latency, and whether
-  cloud mask products can be cut the same way.
+First cutout: `msg-0deg`, nominal time 2024-03-16T22:00Z (night, Sundhnúkur
+eruption in progress). Resolved items:
+
+- **Platform**: the 0° collection served Meteosat-10 (`MSG3`) in March 2024,
+  not Meteosat-11. Sources are therefore keyed by slot and the platform is
+  recorded from product metadata (section 3).
+- **Data Tailor region**: `RegionOfInterest(NSWE=[N, S, W, E])` must be a
+  list of four numbers; a comma string is rejected.
+- **Projection**: with no `projection` in the chain the output stays on the
+  native geostationary grid, with a CF `geostationary` grid mapping variable
+  and `x`/`y` projection coordinates in metres (GRS80 ellipsoid, height
+  35 785 831 m, sweep `y`). Pixel spacing is ~2993 m by ~2997 m in projection
+  units; the ground footprint over Iceland is ~42 km² median.
+- **Cutout size**: 45 rows by 199 columns, 0.43 MB for the image and 0.06 MB
+  for the cloud mask. Pixels outside the lat/lon box but inside its
+  projection-space bounding box are NaN (about 38%).
+- **Grid identity**: the cloud mask cutout has exactly the same
+  `GeoTransform` and shape as the image cutout, so no resampling is needed.
+- **Variables**: image channels are `channel_1` to `channel_11` in SEVIRI
+  band order (VIS0.6, VIS0.8, NIR1.6, IR3.9, WV6.2, WV7.3, IR8.7, IR9.7,
+  IR10.8, IR12.0, IR13.4); HRV is excluded by the Data Tailor. Values are
+  calibrated radiances (offset/slope in the `chNN_cal` global attributes).
+  The cloud mask variable is `cloud_mask` with values 0 to 2 (MSG CLM
+  convention: 0 clear over water, 1 clear over land, 2 cloud; 3/no data
+  appears as NaN **[verify]**).
+- **Timing**: 106 s for the image customisation and 45 s for the cloud
+  mask, including queueing and download; ~2.5 min per timestamp sequentially.
+  Data Tailor workspace quota is 20 GB; customisations are deleted after
+  download.
+- **Idempotency**: `thermal fetch` now reuses a cutout already in the
+  private bucket instead of re-running the Data Tailor.
+
+## 14. Remaining items to verify
+
+- Slot history: which platform served 0° on which dates across the archive
+  (read from product metadata as data is fetched; keep a table).
+- RSS and FCI collection ids and Data Tailor product types.
 - Saturation handling and flagging in the level 1.5 cutout.
+- Cloud mask value semantics, in particular how no-data is encoded.
 - Radiance units and the conversion needed for the MIR method constant.
 - Whether solar/satellite azimuth should be computed from first principles or
   read from product metadata.
