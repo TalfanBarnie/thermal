@@ -595,7 +595,25 @@ slice ran in date order; later slices run in a fixed shuffled order).
 - Verified locally in headless Chromium against the live bucket at desktop
   and phone widths in both themes: no console errors, no overflow.
 
-## 18. Remaining items to verify
+## 18. Milestone M6 status (2026-11-06, in progress)
+
+- `thermal backfill --mode process [--force]`: the resumable batch runner
+  now also models and publishes (products, rows, index). With `--force` it
+  re-makes existing products, which is the reprocess path after a retrain.
+- `thermal eruption-windows`: timestamps covering every calendar eruption
+  since 2021 with a 2 day margin, 3-hourly, plus hourly for the first 3 days
+  of each eruption: 3976 timestamps in
+  `data/samples/msg-0deg_eruptions.csv`. Fetching them is the `eruptions`
+  backfill job (fetch mode); processing follows once the full models exist.
+- `thermal validate`: reads the public shards over HTTP, reports per
+  eruption the first sample above a threshold and its delay from the
+  calendar start, false alarms outside the buffered windows, and exports one
+  CSV per eruption window for the effusion-rate analysis.
+- Pending: retrain both eras on the full samples, choose the candidates,
+  process the eruption windows and reprocess the live rows, then run the
+  validation and record the results here.
+
+## 19. Remaining items to verify
 
 - Exact handover times in `data/platform_history.csv` (the backfill records
   the platform of every fetched product, which will confirm them).

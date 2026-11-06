@@ -82,3 +82,42 @@ def regular_range(start: datetime, end: datetime, step_minutes: int) -> list[dat
         out.append(t)
         t += timedelta(minutes=step_minutes)
     return out
+
+
+def eruption_windows(
+    eruptions,
+    since: datetime | None = None,
+    margin_days: float = 2.0,
+    step_minutes: int = 180,
+    onset_step_minutes: int = 60,
+    onset_days: float = 3.0,
+    cadence_minutes: int = 15,
+    today: datetime | None = None,
+) -> list[datetime]:
+    """Timestamps covering each eruption window plus a margin either side.
+
+    A coarse step over the whole window, and a finer step for the first `onset_days`
+    after the start, where the effusion rate changes fastest. Times are aligned to the
+    source cadence.
+    """
+    today = today or datetime.now(UTC)
+    out: set[datetime] = set()
+    for e in eruptions:
+        start = datetime(e.start.year, e.start.month, e.start.day, tzinfo=UTC)
+        end_date = e.end or today.date()
+        end = datetime(end_date.year, end_date.month, end_date.day, tzinfo=UTC) + timedelta(days=1)
+        if since is not None and end < since:
+            continue
+        a = start - timedelta(days=margin_days)
+        b = min(end + timedelta(days=margin_days), today)
+        for t in regular_range(a, b, step_minutes):
+            out.add(t)
+        for t in regular_range(
+            start, min(start + timedelta(days=onset_days), b), onset_step_minutes
+        ):
+            out.add(t)
+    aligned = {
+        t.replace(minute=(t.minute // cadence_minutes) * cadence_minutes, second=0, microsecond=0)
+        for t in out
+    }
+    return sorted(t for t in aligned if since is None or t >= since)

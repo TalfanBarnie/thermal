@@ -32,6 +32,15 @@ on:
         description: re-dispatch this workflow automatically while timestamps remain
         type: boolean
         default: true
+      mode:
+        description: fetch raw cutouts only, or process (fetch, model, publish)
+        type: choice
+        options: [fetch, process]
+        default: fetch
+      force:
+        description: process mode only, re-make products that already exist
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: write
@@ -60,15 +69,16 @@ jobs:
       - name: backfill
         id: backfill
         run: |
+          EXTRA="--mode ${{ inputs.mode || 'fetch' }} ${{ inputs.force && '--force' || '' }}"
           if [ -n "${{ inputs.list }}" ]; then
             thermal backfill --sat "${{ inputs.sat }}" --job-id "${{ inputs.job_id }}" \
               --list "${{ inputs.list }}" --max-minutes "${{ inputs.max_minutes }}" \
-              --concurrency "${{ inputs.concurrency }}" --summary-json "$RUNNER_TEMP/summary.json"
+              --concurrency "${{ inputs.concurrency }}" --summary-json "$RUNNER_TEMP/summary.json" $EXTRA
           else
             thermal backfill --sat "${{ inputs.sat }}" --job-id "${{ inputs.job_id }}" \
               --start "${{ inputs.start }}" --end "${{ inputs.end }}" \
               --step-minutes "${{ inputs.step_minutes }}" --max-minutes "${{ inputs.max_minutes }}" \
-              --concurrency "${{ inputs.concurrency }}" --summary-json "$RUNNER_TEMP/summary.json"
+              --concurrency "${{ inputs.concurrency }}" --summary-json "$RUNNER_TEMP/summary.json" $EXTRA
           fi
           echo "remaining=$(python -c "import json;print(json.load(open('$RUNNER_TEMP/summary.json'))['remaining'])")" >> "$GITHUB_OUTPUT"
       - name: re-dispatch while work remains
@@ -80,3 +90,4 @@ jobs:
           -f sat="${{ inputs.sat }}" -f job_id="${{ inputs.job_id }}" -f list="${{ inputs.list }}"
           -f start="${{ inputs.start }}" -f end="${{ inputs.end }}" -f step_minutes="${{ inputs.step_minutes }}"
           -f max_minutes="${{ inputs.max_minutes }}" -f concurrency="${{ inputs.concurrency }}" -f chain=true
+          -f mode="${{ inputs.mode || 'fetch' }}" -f force=${{ inputs.force && 'true' || 'false' }}

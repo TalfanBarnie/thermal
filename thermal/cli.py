@@ -279,6 +279,58 @@ def cmd_sample(args) -> int:
     return 0
 
 
+def cmd_validate(args) -> int:
+    """Onset detection and false alarms against the eruption calendar, from public shards."""
+    from . import validate
+    from .calendar import Calendar
+
+    public_url = args.public_url or config.load_settings().b2_public_url
+    cal = Calendar.from_file()
+    rows = validate.load_rows(public_url, args.sat, args.region)
+    print(f"{len(rows)} samples for {args.sat}/{args.region}")
+    report = validate.onset_report(rows, cal.eruptions, stat=args.stat, threshold=args.threshold)
+    print(f"\nOnsets ({args.stat} >= {args.threshold}):")
+    widths = (32, 10, 5, 5, 20, 8, 5, 9)
+    head = ("volcano", "start", "n", "hits", "first hit", "delay h", "early", "peak")
+    print(
+        " ".join(
+            h.ljust(w) if i < 2 or i == 4 else h.rjust(w)
+            for i, (h, w) in enumerate(zip(head, widths, strict=True))
+        )
+    )
+    for r in report:
+        print(
+            f"{r['volcano'][:32]:32} {r['start']:10} {r['n_samples']:5d} {r['n_hits']:5d} "
+            f"{r['first_hit']:20} {str(r['delay_hours']):>8} {r['n_hits_before_start']:5d} "
+            f"{str(r['peak'])[:9]:>9}"
+        )
+    fa = validate.false_alarms(rows, cal, stat=args.stat, threshold=args.threshold)
+    print("\nOutside eruption windows:", json.dumps(fa, indent=1))
+    if args.export:
+        paths = validate.export_eruption_series(rows, cal.eruptions, Path(args.export))
+        print(f"\nexported {len(paths)} eruption series to {args.export}")
+    return 0
+
+
+def cmd_eruption_windows(args) -> int:
+    """Write the timestamps covering every eruption window (plus margins) to a CSV."""
+    from .calendar import load
+
+    sat = config.satellite(args.sat)
+    ts = sampling.eruption_windows(
+        load(),
+        since=parse_time(args.since) if args.since else None,
+        margin_days=args.margin_days,
+        step_minutes=args.step_minutes,
+        onset_step_minutes=args.onset_step_minutes,
+        onset_days=args.onset_days,
+        cadence_minutes=sat["cadence_minutes"],
+    )
+    sampling.write_list(Path(args.out), ts, sat["key"])
+    print(f"wrote {len(ts)} timestamps to {args.out}")
+    return 0
+
+
 def cmd_backfill(args) -> int:
     """Fetch many timestamps, resumably, within a wall-clock budget."""
     from .backfill import run_backfill
@@ -302,6 +354,8 @@ def cmd_backfill(args) -> int:
         max_minutes=args.max_minutes,
         concurrency=args.concurrency,
         cloudmask=not args.no_cloudmask,
+        mode=args.mode,
+        force=args.force,
     )
     print(json.dumps(summary, indent=1))
     if args.summary_json:
@@ -391,7 +445,33 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--concurrency", type=int, default=2)
     b.add_argument("--no-cloudmask", action="store_true")
     b.add_argument("--summary-json", help="write the run summary to this file")
+    b.add_argument(
+        "--mode",
+        choices=["fetch", "process"],
+        default="fetch",
+        help="fetch raw cutouts only, or also model and publish products",
+    )
+    b.add_argument("--force", action="store_true", help="process: re-make existing products")
     b.set_defaults(func=cmd_backfill)
+
+    va = sub.add_parser("validate", help="onset detection against the calendar from public shards")
+    va.add_argument("--sat", default="msg-0deg")
+    va.add_argument("--region", default="reykjanes")
+    va.add_argument("--stat", default="max_z")
+    va.add_argument("--threshold", type=float, default=4.0)
+    va.add_argument("--public-url", help="default: B2_PUBLIC_URL from the environment")
+    va.add_argument("--export", help="directory for per-eruption CSV exports")
+    va.set_defaults(func=cmd_validate)
+
+    ew = sub.add_parser("eruption-windows", help="timestamps covering the eruption calendar")
+    ew.add_argument("--sat", default="msg-0deg")
+    ew.add_argument("--since", default="2021-01-01", help="ignore eruptions ending before this")
+    ew.add_argument("--margin-days", type=float, default=2.0)
+    ew.add_argument("--step-minutes", type=int, default=180)
+    ew.add_argument("--onset-step-minutes", type=int, default=60)
+    ew.add_argument("--onset-days", type=float, default=3.0)
+    ew.add_argument("--out", required=True)
+    ew.set_defaults(func=cmd_eruption_windows)
     return p
 
 

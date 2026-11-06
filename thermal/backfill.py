@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from . import pipeline
+from . import pipeline, timeseries
 from .storage import Storage
 
 log = logging.getLogger(__name__)
@@ -76,9 +76,24 @@ def run_backfill(
     max_attempts: int = 3,
     cloudmask: bool = True,
     save_every: int = 5,
+    mode: str = "fetch",
+    force: bool = False,
+    sat_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Fetch every timestamp not yet done, within a wall-clock budget. Returns a summary."""
+    """Run every timestamp not yet done, within a wall-clock budget. Returns a summary.
+
+    mode "fetch": store raw cutouts only. mode "process": fetch (or reuse), apply the
+    background model, and publish products and time series rows; with force=True existing
+    products are re-made (used after a retrain). State is per job id and resumable.
+    """
+    if mode not in ("fetch", "process"):
+        raise ValueError(f"unknown mode {mode}")
     state = BackfillState(storage, job_id)
+    model_cache = None
+    if mode == "process":
+        from .live import ModelCache
+
+        model_cache = ModelCache(storage, Path(tempfile.mkdtemp(prefix="models-")))
     deadline = time.monotonic() + max_minutes * 60.0
     started = datetime.now(UTC)
     todo = [
@@ -107,6 +122,17 @@ def run_backfill(
     def work(t: datetime) -> tuple[str, dict[str, Any]]:
         ts = t.strftime("%Y%m%dT%H%M%S")
         out_dir = tmp_root / ts
+        if mode == "process":
+            from .live import process_timestamp
+
+            r = process_timestamp(client, storage, sat, t, model_cache, out_dir, force=force)
+            info = {"ok": bool(r.get("ok")), "platform": r.get("platform"), "model": r.get("model")}
+            if r.get("skipped"):
+                info["skipped"] = r["skipped"]
+            if not info["ok"]:
+                info["errors"] = r.get("error")
+            _cleanup(out_dir)
+            return ts, info
         if pipeline.already_stored(storage, sat, t, cloudmask):
             return ts, {"ok": True, "reused": True}
         report = pipeline.fetch_timestamp(
@@ -161,8 +187,11 @@ def run_backfill(
         }
     )
     state.save()
+    if mode == "process" and processed:
+        timeseries.build_index(storage, {sat["key"]: sat})
     summary = {
         "job_id": job_id,
+        "mode": mode,
         "requested": len(timestamps),
         "processed_this_run": processed,
         "stopped_for_time": stopped_for_time,
