@@ -95,6 +95,11 @@ def run_backfill(
         max_minutes,
         concurrency,
     )
+    # Process in a fixed pseudo-random order so that a partially complete backfill is a
+    # representative sample of the whole list rather than its earliest dates.
+    import random
+
+    random.Random(job_id).shuffle(todo)
     processed = 0
     stopped_for_time = False
     tmp_root = Path(tempfile.mkdtemp(prefix=f"backfill-{job_id}-"))
