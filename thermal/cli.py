@@ -167,6 +167,8 @@ def cmd_backfill(args) -> int:
         cloudmask=not args.no_cloudmask,
     )
     print(json.dumps(summary, indent=1))
+    if args.summary_json:
+        Path(args.summary_json).write_text(json.dumps(summary))
     return 0
 
 
@@ -220,6 +222,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--max-minutes", type=float, default=330.0, help="wall-clock budget")
     b.add_argument("--concurrency", type=int, default=2)
     b.add_argument("--no-cloudmask", action="store_true")
+    b.add_argument("--summary-json", help="write the run summary to this file")
     b.set_defaults(func=cmd_backfill)
     return p
 

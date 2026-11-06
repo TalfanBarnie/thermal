@@ -28,6 +28,13 @@ on:
       concurrency:
         description: simultaneous Data Tailor customisations
         default: "2"
+      chain:
+        description: re-dispatch this workflow automatically while timestamps remain
+        type: boolean
+        default: true
+permissions:
+  contents: read
+  actions: write
 jobs:
   backfill:
     runs-on: ubuntu-latest
@@ -51,14 +58,25 @@ jobs:
           cache: pip
       - run: pip install -e .
       - name: backfill
+        id: backfill
         run: |
           if [ -n "${{ inputs.list }}" ]; then
             thermal backfill --sat "${{ inputs.sat }}" --job-id "${{ inputs.job_id }}" \
               --list "${{ inputs.list }}" --max-minutes "${{ inputs.max_minutes }}" \
-              --concurrency "${{ inputs.concurrency }}"
+              --concurrency "${{ inputs.concurrency }}" --summary-json "$RUNNER_TEMP/summary.json"
           else
             thermal backfill --sat "${{ inputs.sat }}" --job-id "${{ inputs.job_id }}" \
               --start "${{ inputs.start }}" --end "${{ inputs.end }}" \
               --step-minutes "${{ inputs.step_minutes }}" --max-minutes "${{ inputs.max_minutes }}" \
-              --concurrency "${{ inputs.concurrency }}"
+              --concurrency "${{ inputs.concurrency }}" --summary-json "$RUNNER_TEMP/summary.json"
           fi
+          echo "remaining=$(python -c "import json;print(json.load(open('$RUNNER_TEMP/summary.json'))['remaining'])")" >> "$GITHUB_OUTPUT"
+      - name: re-dispatch while work remains
+        if: ${{ inputs.chain && steps.backfill.outputs.remaining != '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh workflow run backfill.yml --ref "$GITHUB_REF_NAME"
+          -f sat="${{ inputs.sat }}" -f job_id="${{ inputs.job_id }}" -f list="${{ inputs.list }}"
+          -f start="${{ inputs.start }}" -f end="${{ inputs.end }}" -f step_minutes="${{ inputs.step_minutes }}"
+          -f max_minutes="${{ inputs.max_minutes }}" -f concurrency="${{ inputs.concurrency }}" -f chain=true
