@@ -60,6 +60,36 @@ def summarise(path: Path) -> dict[str, Any]:
                 "finite_fraction": float(np.isfinite(lat).mean()),
                 "median_pixel_area_km2": float(np.nanmedian(geo.pixel_area_m2(lat, lon)) / 1e6),
             }
+            out["footprint"] = footprint_check(ds, lat, lon)
         except Exception as exc:
             out["geolocation"] = {"error": str(exc)}
+    return out
+
+
+def footprint_check(ds: xr.Dataset, lat: np.ndarray, lon: np.ndarray) -> dict[str, Any]:
+    """Where do the finite data pixels fall in lat/lon, under the grid as given and flipped?
+
+    The Data Tailor masks pixels outside the requested lat/lon box, so the finite
+    footprint of a correctly georeferenced cutout spans exactly that box. If a flipped
+    orientation matches the box better, the file's georeferencing is inconsistent.
+    """
+    data_var = next(
+        (v for v in ds.data_vars.values() if v.ndim == 2 and np.issubdtype(v.dtype, np.number)),
+        None,
+    )
+    if data_var is None:
+        return {}
+    finite = np.isfinite(data_var.values.astype(float))
+    out: dict[str, Any] = {"variable": data_var.name, "finite_fraction": float(finite.mean())}
+    for name, f in (
+        ("as_is", finite),
+        ("flip_rows", finite[::-1, :]),
+        ("flip_cols", finite[:, ::-1]),
+        ("flip_both", finite[::-1, ::-1]),
+    ):
+        if f.any():
+            out[name] = {
+                "lat_range": [float(np.nanmin(lat[f])), float(np.nanmax(lat[f]))],
+                "lon_range": [float(np.nanmin(lon[f])), float(np.nanmax(lon[f]))],
+            }
     return out
