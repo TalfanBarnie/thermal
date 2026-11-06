@@ -1,41 +1,44 @@
-# One entry per satellite key (<platform>-<slot>). Each key gets its own background model.
-# Fields marked verify are to be confirmed against the Data Store during milestone M1.
-msg11-0deg:
-  description: Meteosat-11 (MSG4) SEVIRI, 0 degree full disk service
-  platform: MSG4                      # Data Store "satellite" property, verify
+# Data sources, one per orbital slot / service. The platform occupying a slot changes over
+# the archive (e.g. the 0 degree service was Meteosat-10/MSG3 in March 2024), so the platform
+# is NOT fixed here: it is read from each product's metadata and recorded with the data.
+# Background models are trained per (source, platform) pair, e.g. msg-0deg/MSG3.
+# Fields marked verify are to be confirmed during milestone M1.
+msg-0deg:
+  description: MSG SEVIRI, 0 degree full disk service (15 min)
   instrument: SEVIRI
   collection: EO:EUM:DAT:MSG:HRSEVIRI
   cloudmask_collection: EO:EUM:DAT:MSG:CLM
-  tailor_product: HRSEVIRI            # Data Tailor product type, verify
-  tailor_cloudmask_product: MSGCLMK   # verify
+  tailor_product: HRSEVIRI
+  tailor_cloudmask_product: MSGCLMK
+  platform_filter: null               # optional Data Store 'sat' value (MSG1..MSG4) to restrict to
   sub_lon: 0.0
   cadence_minutes: 15
   mir_channel: IR_039
   channels: [VIS006, VIS008, IR_016, IR_039, WV_062, WV_073, IR_087, IR_097, IR_108, IR_120]
   monitoring_regions: [reykjanes]
 
-msg10-rss:
-  description: Meteosat-10 (MSG3) SEVIRI, rapid scan service from 9.5E
-  platform: MSG3                      # verify
+msg-rss:
+  description: MSG SEVIRI, rapid scan service from 9.5E (5 min)
   instrument: SEVIRI
   collection: EO:EUM:DAT:MSG:MSG15-RSS
   cloudmask_collection: EO:EUM:DAT:MSG:RSS-CLM
   tailor_product: HRSEVIRI            # verify
   tailor_cloudmask_product: MSGCLMK   # verify
+  platform_filter: null
   sub_lon: 9.5
   cadence_minutes: 5
   mir_channel: IR_039
   channels: [VIS006, VIS008, IR_016, IR_039, WV_062, WV_073, IR_087, IR_097, IR_108, IR_120]
   monitoring_regions: [reykjanes]
 
-mtgi1-0deg:
-  description: MTG-I1 (Meteosat-12) FCI, 0 degree full disk, FDHSI
-  platform: MTI1                      # verify
+mtg-0deg:
+  description: MTG FCI, 0 degree full disk, FDHSI (10 min)
   instrument: FCI
   collection: EO:EUM:DAT:0662         # verify
   cloudmask_collection: null          # verify
   tailor_product: FCIL1FDHSI          # verify
   tailor_cloudmask_product: null
+  platform_filter: null
   sub_lon: 0.0
   cadence_minutes: 10
   mir_channel: ir_38

@@ -89,15 +89,7 @@ class DataStoreClient:
         tol = timedelta(minutes=self._pipeline["search"]["tolerance_minutes"])
         candidates = self.search(collection_id, t - tol, t + tol)
         if platform:
-            filtered = [p for p in candidates if p.satellite == platform]
-            if filtered:
-                candidates = filtered
-            else:
-                log.warning(
-                    "no products from platform %s; platforms seen: %s",
-                    platform,
-                    sorted({p.satellite for p in candidates}),
-                )
+            candidates = [p for p in candidates if p.satellite == platform]
         if not candidates:
             return None
         return min(candidates, key=lambda p: abs(nominal_time(p.sensing_end, cadence_minutes) - t))
@@ -119,7 +111,7 @@ class DataStoreClient:
         self,
         product: Any,
         tailor_product: str,
-        roi_nswe: str,
+        roi_nswe: list[float],
         out_dir: Path,
         fmt: str | None = None,
         projection: str | None = None,

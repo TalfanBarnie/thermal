@@ -7,7 +7,7 @@ on:
     inputs:
       sat:
         description: satellite key
-        default: msg11-0deg
+        default: msg-0deg
       time:
         description: nominal image time (ISO 8601 UTC)
         default: "2024-03-16T22:00:00Z"

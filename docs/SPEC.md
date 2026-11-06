@@ -83,13 +83,12 @@ lat/lon arrays).
 Notes:
 
 - The HRV channel is excluded (different grid, daytime only).
-- Each satellite that occupied the 0° slot (Meteosat-8, 9, 10, 11) and each
-  slot (0°, 9.5°E RSS) gets its own model. The *satellite key* is
-  `<platform>-<slot>`, e.g. `msg11-0deg`, `msg10-rss`, `mtgi1-0deg`.
-  **[verify]** which platform occupied which slot on which dates; the Data
-  Store product metadata carries the platform name.
-- Reykjanes eruptions 2021 to 2024 were imaged by Meteosat-11 at 0°
-  **[verify]**, so the first model is `msg11-0deg`.
+- Data *sources* are keyed by slot/service (`msg-0deg`, `msg-rss`,
+  `mtg-0deg`) in `config/satellites.yaml`. The platform occupying a slot
+  changes over the archive (M1 found Meteosat-10/MSG3 serving 0° in March
+  2024), so the platform is read from each product's metadata and stored
+  with the data rather than fixed in config. Background models are trained
+  per (source, platform) pair, e.g. `msg-0deg/MSG3`.
 - Raw cutouts are kept permanently in the private bucket (section 9), because
   re-ordering from the Data Tailor is slow and quota-limited.
 

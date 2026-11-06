@@ -4,9 +4,9 @@ from thermal import config
 
 
 def test_satellites_load():
-    sat = config.satellite("msg11-0deg")
+    sat = config.satellite("msg-0deg")
     assert sat["collection"] == "EO:EUM:DAT:MSG:HRSEVIRI"
-    assert sat["key"] == "msg11-0deg"
+    assert sat["key"] == "msg-0deg"
     assert "IR_039" in sat["channels"]
 
 

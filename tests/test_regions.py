@@ -5,7 +5,7 @@ from thermal import regions
 
 def test_box_nswe_string():
     s = regions.box_nswe({"north": 66.8, "south": 63.1, "west": -25.0, "east": -13.0})
-    assert s == "66.8,63.1,-25.0,-13.0"
+    assert s == [66.8, 63.1, -25.0, -13.0]
 
 
 def test_reykjanes_mask():

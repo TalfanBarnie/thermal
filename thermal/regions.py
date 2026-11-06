@@ -8,10 +8,10 @@ import shapely
 from . import config
 
 
-def box_nswe(box: dict[str, float] | None = None) -> str:
-    """Iceland box as the Data Tailor 'N,S,W,E' string."""
+def box_nswe(box: dict[str, float] | None = None) -> list[float]:
+    """Iceland box as the Data Tailor NSWE list (the service rejects a comma string)."""
     b = box or config.iceland_box()
-    return f"{b['north']},{b['south']},{b['west']},{b['east']}"
+    return [float(b["north"]), float(b["south"]), float(b["west"]), float(b["east"])]
 
 
 def box_mask(lat: np.ndarray, lon: np.ndarray, box: dict[str, float] | None = None) -> np.ndarray:

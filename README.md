@@ -28,7 +28,7 @@ Credentials are read from the environment using the names in the spec:
 
 ```bash
 thermal smoke                                   # check buckets and Data Store access
-thermal fetch --sat msg11-0deg --time 2024-03-16T22:00:00Z --out ./scratch
+thermal fetch --sat msg-0deg --time 2024-03-16T22:00:00Z --out ./scratch
 thermal inspect ./scratch/l15/*.nc              # metadata summary of a cutout
 ```
 

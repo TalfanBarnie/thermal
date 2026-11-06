@@ -94,7 +94,7 @@ def cmd_fetch(args) -> int:
         report["products"][kind] = entry
         try:
             product = client.product_at(
-                coll_id, t, sat["cadence_minutes"], platform=sat.get("platform")
+                coll_id, t, sat["cadence_minutes"], platform=sat.get("platform_filter")
             )
             if product is None:
                 raise RuntimeError(f"no product found in {coll_id} near {t.isoformat()}")
@@ -142,11 +142,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("smoke", help="check credentials for B2 and the EUMETSAT Data Store")
-    s.add_argument("--sats", nargs="*", default=["msg11-0deg"], help="satellite keys to check")
+    s.add_argument("--sats", nargs="*", default=["msg-0deg"], help="satellite keys to check")
     s.set_defaults(func=cmd_smoke)
 
     f = sub.add_parser("fetch", help="fetch one timestamp through the Data Tailor")
-    f.add_argument("--sat", default="msg11-0deg")
+    f.add_argument("--sat", default="msg-0deg")
     f.add_argument("--time", required=True, help="nominal image time, ISO 8601 UTC")
     f.add_argument("--out", help="local output directory (default: temp dir)")
     f.add_argument("--no-upload", action="store_true", help="do not write to the private bucket")
@@ -165,6 +165,8 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    for noisy in ("botocore", "boto3", "urllib3", "s3transfer", "charset_normalizer"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     return args.func(args)
 
 

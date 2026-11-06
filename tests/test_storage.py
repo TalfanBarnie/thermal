@@ -6,13 +6,8 @@ from thermal.config import BucketCredentials
 
 def test_key_layout():
     t = datetime(2024, 3, 16, 22, 0, tzinfo=UTC)
-    assert (
-        storage.raw_key("msg11-0deg", t, "l15")
-        == "raw/msg11-0deg/2024/03/16/20240316T220000_l15.nc"
-    )
-    assert (
-        storage.fetch_report_key("msg11-0deg", t) == "reports/fetch/msg11-0deg/20240316T220000.json"
-    )
+    assert storage.raw_key("msg-0deg", t, "l15") == "raw/msg-0deg/2024/03/16/20240316T220000_l15.nc"
+    assert storage.fetch_report_key("msg-0deg", t) == "reports/fetch/msg-0deg/20240316T220000.json"
 
 
 class FakeClient:

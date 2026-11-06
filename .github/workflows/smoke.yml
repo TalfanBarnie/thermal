@@ -6,7 +6,7 @@ on:
     inputs:
       sats:
         description: satellite keys to check (space separated)
-        default: msg11-0deg
+        default: msg-0deg
 jobs:
   smoke:
     runs-on: ubuntu-latest
