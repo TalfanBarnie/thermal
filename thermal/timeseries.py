@@ -12,10 +12,13 @@ import numpy as np
 from . import geo
 from .storage import Storage
 
-# Wooster et al. (2003) MIR method: VRP [W] = 1.89e7 * A_pixel [m2] * dL [W m-2 sr-1 um-1].
-# SEVIRI radiances are in mW m-2 sr-1 (cm-1)-1; converting per-wavenumber to per-micron at
+# Wooster et al. (2003) MIR method: radiant power = (sigma / a) * A_pixel * dL_MIR, where
+# a ~ 3.0e-9 W m-2 sr-1 um-1 K-4 is the fourth-power fit of MIR radiance to temperature for
+# 600-1500 K, so sigma / a ~ 18.9 W m-2 per (W m-2 sr-1 um-1). With A in m2 and dL in
+# W m-2 sr-1 um-1 the result is in W. (The widely quoted 1.89e7 is the same constant with
+# A in km2.) SEVIRI radiances are in mW m-2 sr-1 (cm-1)-1; per-wavenumber to per-micron at
 # the IR3.9 central wavenumber multiplies by nu_c^2 * 1e-4, and mW -> W by 1e-3. [verify]
-MIR_METHOD_CONSTANT = 1.89e7
+MIR_METHOD_CONSTANT = 18.9
 
 
 def radiance_per_cm_to_per_um(delta_l_mw: float | np.ndarray, nu_c: float = 2547.771):

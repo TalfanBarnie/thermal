@@ -9,6 +9,12 @@ def test_radiance_conversion_factor():
     assert abs(timeseries.radiance_per_cm_to_per_um(1.0) - 0.649) < 0.01
 
 
+def test_vrp_order_of_magnitude():
+    # one 42 km2 pixel with 0.2 mW m-2 sr-1 (cm-1)-1 excess: ~ 42e6 * 18.9 * 0.13 W ~ 1e8 W
+    vrp = timeseries.MIR_METHOD_CONSTANT * 42e6 * timeseries.radiance_per_cm_to_per_um(0.2)
+    assert 5e7 < vrp < 2e8
+
+
 def test_shard_upsert_merges_and_sorts():
     storage = FakeStorage()
     rows = [
