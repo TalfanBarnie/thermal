@@ -70,6 +70,8 @@ def build_products(
     if cloud is not None:
         flags[cloud == 2] |= 4
         flags[~np.isfinite(cloud)] |= 8  # cloud mask unavailable
+    else:
+        flags[fs.valid] |= 8  # no cloud mask cutout at all
     arrays = {
         "residual": images["residual"].astype(np.float32),
         "zscore": images["zscore"].astype(np.float32),

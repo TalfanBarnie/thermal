@@ -5,7 +5,7 @@ import numpy as np
 
 from tests.synthetic import make_cutout
 from tests.test_backfill import FakeStorage
-from thermal import config, live, products, timeseries
+from thermal import config, live, pipeline, products, timeseries
 from thermal.model import save_model
 from training import data, models
 
@@ -105,3 +105,36 @@ def test_candidate_window_respects_min_age(monkeypatch):
     got = live.candidate_times(C(), sat, now - timedelta(hours=4), now - timedelta(minutes=75))
     assert all(t <= now - timedelta(minutes=75) for t in got)
     assert len(got) == 3
+
+
+def test_process_timestamp_uses_fresh_fetch_paths(tmp_path, monkeypatch):
+    """A cutout straight from the Data Tailor has its own filename; process must use it."""
+    sat = config.satellite("msg-0deg")
+    storage = FakeStorage()
+    objects = storage.private._client.objects
+    storage.private.exists = lambda key: key in objects
+    storage.public.exists = storage.private.exists
+    storage.private.put_file = lambda key, path, content_type=None: objects.__setitem__(
+        key, Path(path).read_bytes()
+    )
+    storage.public.put_file = storage.private.put_file
+    storage.private.get_file = lambda key, path: (
+        Path(path).parent.mkdir(parents=True, exist_ok=True),
+        Path(path).write_bytes(objects[key]),
+    )
+    model_path = _train_model(tmp_path, sat)
+    objects["models/msg-0deg/MSG3/latest.json"] = (
+        b'{"model_id": "ridge_test", "key": "models/msg-0deg/MSG3/ridge_test.npz"}'
+    )
+    objects["models/msg-0deg/MSG3/ridge_test.npz"] = model_path.read_bytes()
+    t = datetime(2024, 3, 16, 22, tzinfo=UTC)
+    fresh = make_cutout(tmp_path / "HRSEVIRI_20240316T214509Z_epct_abc_C.nc", seed=3)
+
+    def fake_fetch(client, storage_, sat_, t_, out_dir, **kw):
+        return {"ok": False, "products": {"l15": {"local_path": str(fresh)}, "clm": {"error": "x"}}}
+
+    monkeypatch.setattr(pipeline, "fetch_timestamp", fake_fetch)
+    cache = live.ModelCache(storage, tmp_path / "models")
+    result = live.process_timestamp(None, storage, sat, t, cache, tmp_path / "work")
+    assert result["ok"], result
+    assert result["rows"][0]["n_cloud_unknown"] == result["rows"][0]["n_valid"]  # no cloud mask

@@ -85,6 +85,7 @@ def fetch_timestamp(
                     storage.private.put_file(key, nc_path, content_type="application/x-netcdf")
                     entry["stored_key"] = key
                     log.info("stored %s", key)
+            entry["local_path"] = str(nc_path)
             if summarise:
                 entry["summary"] = inspect.summarise(nc_path)
             if quicklook:

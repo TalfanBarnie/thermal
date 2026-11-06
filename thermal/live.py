@@ -13,7 +13,7 @@ from typing import Any
 from . import anomaly, config, features, pipeline, products, regions, timeseries
 from .datastore import nominal_time
 from .model import BackgroundModel
-from .storage import Storage, raw_key, state_key
+from .storage import Storage, state_key
 
 log = logging.getLogger(__name__)
 
@@ -72,8 +72,9 @@ def process_timestamp(
     if "error" in report["products"].get("l15", {}):
         result["error"] = report["products"]["l15"]["error"]
         return result
-    l15 = out_dir / "l15" / raw_key(sat["key"], t, "l15").rsplit("/", 1)[-1]
-    clm = out_dir / "clm" / raw_key(sat["key"], t, "clm").rsplit("/", 1)[-1]
+    l15 = Path(report["products"]["l15"]["local_path"])
+    clm_entry = report["products"].get("clm", {})
+    clm = Path(clm_entry["local_path"]) if "local_path" in clm_entry else out_dir / "no-clm"
     fs = features.build_features(l15, t, sat)
     try:
         model, model_id = model_cache.get(sat["key"], fs.platform)
