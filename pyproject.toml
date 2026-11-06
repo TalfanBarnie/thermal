@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "ruff>=0.5", "scikit-learn>=1.4"]
 train = ["torch", "scikit-learn", "pandas", "pyarrow"]
 analysis = ["cmdstanpy", "pandas", "pyarrow", "matplotlib"]
 
