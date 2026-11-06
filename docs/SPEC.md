@@ -501,7 +501,36 @@ eruption in progress). Resolved items:
 - **Eruption calendar**: `data/eruptions.csv`, 18 rows, from the GVP web
   service and Wikipedia wikitext via `scripts/scrape_eruptions.py`.
 
-## 15. Remaining items to verify
+## 15. Milestone M3 status (2026-11-06)
+
+Code complete and exercised end to end on the first 29 cutouts of the MSG3
+training sample (all from March and April 2023, since the first backfill
+slice ran in date order; later slices run in a fixed shuffled order).
+
+- `thermal/features.py` builds the 26-feature matrix (10 radiances, 7
+  brightness temperatures, solar zenith and relative azimuth, viewing
+  zenith, lat, lon, day-of-year) identically for training and inference.
+- `training/` fits a degree-2 polynomial ridge and a 3x128 GELU MLP, both
+  predicting mean and log-variance, evaluates on held-out whole days, and
+  exports numpy `.npz` artefacts that `thermal/model.py` runs with no torch.
+- `thermal predict` applies the bucket's latest model to a timestamp and
+  writes residual, z-score, observed and predicted quicklooks plus
+  monitoring-region statistics.
+- First numbers (29 images, 20% of days held out; a smoke test, not a
+  result): MLP test RMSE 3.7 K, ridge 4.3 K, in IR3.9 brightness
+  temperature; night-time training residual 1.6 K RMSE. The z-score spread
+  on held-out days was 1.4, so the variance head is over-confident at this
+  data volume.
+- Detection check on 2024-03-16T22:00Z (Meteosat-10, fully cloudy): the
+  residual image is flat apart from the eruption, maximum z-score 13.9,
+  8 pixels above z=4 in the Reykjanes region. Cloud structure that
+  dominated the raw IR3.9 image is removed by the model.
+- Remaining for M3: retrain once the backfills complete (~1000 images per
+  era), compare the candidates per solar-zenith bin, check the residual
+  noise floor at night against the instrument NEdT, and add the spatial
+  mean-residual map and histogram figures to the report.
+
+## 16. Remaining items to verify
 
 - Exact handover times in `data/platform_history.csv` (the backfill records
   the platform of every fetched product, which will confirm them).
