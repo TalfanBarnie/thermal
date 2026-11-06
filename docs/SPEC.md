@@ -467,6 +467,15 @@ eruption in progress). Resolved items:
   download.
 - **Idempotency**: `thermal fetch` now reuses a cutout already in the
   private bucket instead of re-running the Data Tailor.
+- **Signal check**: the IR3.9 quicklook shows one isolated bright pixel
+  cluster at the Reykjanes peninsula, absent from IR10.8, with the rest of
+  the scene cloud-covered. The eruption is detectable through cloud in a
+  single raw channel, before any modelling.
+- **Cloud mask oddity**: the cloud mask cutout shares the image grid but its
+  finite footprint is smaller (49% vs 62% of pixels) and every finite value
+  is 2 (cloud). Either the scene was fully cloudy and no-data/clear classes
+  are encoded as NaN, or the GRIB to netCDF conversion drops classes 0, 1
+  and 3. To be resolved on a partly clear daytime scene in M2.
 
 ## 14. Remaining items to verify
 
