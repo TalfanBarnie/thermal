@@ -553,6 +553,24 @@ slice ran in date order; later slices run in a fixed shuffled order).
 - Models are loaded per platform from `models/<sat>/<platform>/latest.json`;
   a timestamp whose platform has no model is recorded as an error and left
   for a later run.
+- **Near-real-time embargo (found in M4)**: the Data Store returns 403 for
+  image products younger than about one hour for this account (the cloud
+  mask has no such limit). `thermal probe` measures it; the live loop only
+  considers nominal times older than `live.min_age_minutes` (75) in
+  `config/pipeline.yaml`, and a 403 is not retried.
+- **Verified end to end** on 2026-11-06: three evening timestamps fetched,
+  modelled, published to `products/` and `timeseries/msg-0deg/reykjanes/2026-11.jsonl`,
+  state and `index.json` updated. The rows carry nonsense values (mean
+  residual −0.69, z-scores in the thousands) because the 29-image smoke
+  model extrapolates badly to a November night; they will be replaced once
+  the full model exists. Rows are keyed by time, so reprocessing overwrites.
+- **Scheduled runs need the default branch**: GitHub only fires cron
+  schedules from the repository's default branch, so the hourly `live`
+  workflow starts once this branch is merged (or made the default). Until
+  then it can be dispatched manually.
+- **Still to do**: a `reprocess` mode that re-runs existing products with a
+  newer model (needed after every retrain and for the eruption backfill),
+  and the parquet compaction of the shards for analysis.
 
 ## 17. Remaining items to verify
 
