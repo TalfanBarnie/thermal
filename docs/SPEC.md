@@ -90,7 +90,7 @@ Notes:
   Store product metadata carries the platform name.
 - Reykjanes eruptions 2021 to 2024 were imaged by Meteosat-11 at 0°
   **[verify]**, so the first model is `msg11-0deg`.
-- Raw cutouts are kept permanently in the bucket (section 7), because
+- Raw cutouts are kept permanently in the private bucket (section 9), because
   re-ordering from the Data Tailor is slow and quota-limited.
 
 ### Data Tailor usage
@@ -260,7 +260,7 @@ thermal/                     Python package (runtime, numpy-only inference)
   model.py                   load .npz, predict mean/variance
   anomaly.py                 residuals, flags, region statistics
   render.py                  PNG rendering
-  storage.py                 B2 (S3 API via boto3): put/get, state file, time series append
+  storage.py                 B2 (S3 API via boto3): private and public buckets, state file, time series append
   pipeline.py                process one timestamp end to end; catch-up loop
   cli.py                     `thermal fetch|process|backfill|sample|train|evaluate`
 training/                    torch/sklearn training and evaluation (separate extra)
@@ -308,40 +308,65 @@ and are re-dispatched as needed.
 candidates, writes the evaluation report to `reports/` in the bucket and the
 `.npz` artefacts to `models/`. Training may also be run locally.
 
-## 9. Bucket layout
+## 9. Bucket layout and data licensing
 
-Backblaze B2, S3-compatible API. One bucket, public read, CORS enabled for
-the GitHub Pages origin.
+The EUMETSAT terms of use prohibit redistribution of the original numerical
+data. The project therefore uses **two Backblaze B2 buckets**:
+
+- **Private bucket**: everything that is, or could be used to reconstruct,
+  EUMETSAT data, plus internal pipeline state. Read and written only by the
+  Action (and by the maintainer for training and analysis). Raw cutouts are
+  never committed to the repository and never printed to Action logs.
+- **Public bucket**: exactly the set of derived files the web app reads,
+  nothing else. Public read, CORS enabled for the GitHub Pages origin.
+
+Observed-channel quicklook PNGs in the public bucket are colour-mapped,
+8-bit, fixed-scale renderings with a visible attribution line, not
+recoverable as numerical data. **[verify]** against the exact licence text
+that such quicklooks and the derived statistics are permitted; if in doubt,
+drop the observed-channel quicklooks from the public bucket and show only
+derived images.
+
+### Private bucket
 
 ```
 raw/<sat>/<YYYY>/<MM>/<DD>/<YYYYMMDDTHHMMSS>_l15.nc      Data Tailor image cutout
 raw/<sat>/<YYYY>/<MM>/<DD>/<YYYYMMDDTHHMMSS>_clm.nc      cloud mask cutout
-products/<sat>/<YYYY>/<MM>/<DD>/<YYYYMMDDTHHMMSS>/residual.npz
-products/<sat>/<YYYY>/<MM>/<DD>/<YYYYMMDDTHHMMSS>/{ir39,ir39_pred,residual,ir108,vis06,clm}.png
-timeseries/<sat>/<region>.jsonl                           one JSON object per line (append)
-timeseries/<sat>/<region>.parquet                         periodic compaction for analysis
+products/<sat>/<YYYY>/<MM>/<DD>/<YYYYMMDDTHHMMSS>/residual.npz   residual, zscore, flags
 models/<sat>/<model_id>.npz, models/<sat>/latest.json
 reports/<sat>/<model_id>/...                               evaluation outputs
+timeseries/<sat>/<region>.parquet                         compacted series for analysis
 state/<sat>.json                                           live pipeline state
 state/backfill/<job_id>.json                               backfill progress
+```
+
+### Public bucket
+
+```
+products/<sat>/<YYYY>/<MM>/<DD>/<YYYYMMDDTHHMMSS>/{ir39,ir39_pred,residual,ir108,vis06,clm}.png
+timeseries/<sat>/<region>/<YYYY>-<MM>.jsonl               one JSON object per line
 index.json                                                 satellites, regions, time ranges, model ids
 ```
 
-Because B2 objects are immutable, the "append" to `.jsonl` is implemented
-as read-modify-write of a per-month shard
-(`timeseries/<sat>/<region>/<YYYY>-<MM>.jsonl`) with the web app fetching
-the shards it needs. **[decide]** shard granularity once volumes are known.
+Because B2 objects are immutable, the "append" to a time series shard is a
+read-modify-write of the per-month file. **[decide]** shard granularity once
+volumes are known.
 
 ### Secrets and variables
+
+Each bucket has its own application key restricted to that bucket, so a
+leaked public-bucket key cannot read raw data.
 
 Repository secrets:
 
 - `EUMETSAT_CONSUMER_KEY`, `EUMETSAT_CONSUMER_SECRET`
-- `B2_KEY_ID`, `B2_APPLICATION_KEY`
+- `B2_PRIVATE_KEY_ID`, `B2_PRIVATE_APPLICATION_KEY`
+- `B2_PUBLIC_KEY_ID`, `B2_PUBLIC_APPLICATION_KEY`
 
 Repository variables:
 
-- `B2_BUCKET`, `B2_ENDPOINT` (S3 regional endpoint hostname)
+- `B2_PRIVATE_BUCKET`, `B2_PUBLIC_BUCKET`
+- `B2_ENDPOINT` (S3 regional endpoint hostname, shared by both buckets)
 - `B2_PUBLIC_URL` (base URL the web app reads from)
 
 ## 10. Web app
