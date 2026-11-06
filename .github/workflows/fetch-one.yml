@@ -15,6 +15,10 @@ on:
         description: store the cutouts in the private bucket
         type: boolean
         default: true
+      print_quicklooks:
+        description: also print the quicklook PNGs base64-encoded into the log (debugging)
+        type: boolean
+        default: false
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -39,6 +43,14 @@ jobs:
       - run: >
           thermal -v fetch --sat "${{ inputs.sat }}" --time "${{ inputs.time }}"
           --out "$RUNNER_TEMP/fetch" --quicklook ${{ inputs.upload == false && '--no-upload' || '' }}
+      - name: print quicklooks (base64) for inspection without artifact access
+        if: ${{ inputs.print_quicklooks }}
+        run: |
+          for f in "$RUNNER_TEMP"/fetch/quicklook/*/*.png; do
+            echo "=== BEGIN $(basename "$(dirname "$f")")/$(basename "$f")"
+            base64 -w0 "$f"; echo
+            echo "=== END"
+          done
       - name: upload metadata report and quicklooks (no numerical satellite data)
         if: always()
         uses: actions/upload-artifact@v4
