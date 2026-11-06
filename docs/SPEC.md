@@ -141,9 +141,11 @@ Initial regions:
 ## 5. Eruption exclusion calendar
 
 File: `data/eruptions.csv`, columns `volcano, start_date, end_date, source,
-notes`. Initially scraped from Wikipedia (list of volcanic eruptions in
-Iceland and the Reykjanes/Sundhnúkur eruption pages), then hand-curated and
-committed. Must cover at least Eyjafjallajökull 2010, Grímsvötn 2011,
+notes`. Compiled (M2) from the Global Volcanism Program eruption web service
+and Wikipedia wikitext fetched by `scripts/scrape_eruptions.py` in the
+`scrape eruption tables` workflow, then hand-curated and committed. Each
+Sundhnúkur fissure eruption is its own row; a few end dates are marked
+"verify" in the notes, which the 30 day buffer makes immaterial for training. Must cover at least Eyjafjallajökull 2010, Grímsvötn 2011,
 Holuhraun 2014–2015, Fagradalsfjall 2021, 2022, Litli-Hrútur 2023, and every
 Sundhnúkur event from December 2023 onwards. The `end_date` of an ongoing
 eruption is empty and treated as "today".
@@ -471,11 +473,13 @@ eruption in progress). Resolved items:
   cluster at the Reykjanes peninsula, absent from IR10.8, with the rest of
   the scene cloud-covered. The eruption is detectable through cloud in a
   single raw channel, before any modelling.
-- **Cloud mask oddity**: the cloud mask cutout shares the image grid but its
-  finite footprint is smaller (49% vs 62% of pixels) and every finite value
-  is 2 (cloud). Either the scene was fully cloudy and no-data/clear classes
-  are encoded as NaN, or the GRIB to netCDF conversion drops classes 0, 1
-  and 3. To be resolved on a partly clear daytime scene in M2.
+- **Cloud mask (resolved in M2)**: a daytime scene (2023-07-12T13:00Z)
+  shows all three classes (0 clear sea, 1 clear land, 2 cloud) and the
+  footprint check (`inspect.footprint_check`) confirms the finite pixels of
+  both cutouts span the same lat/lon box, so the grids agree. The cloud mask
+  simply has no data in a band along the north-west edge of the box (49% vs
+  62% finite), consistent with a satellite zenith angle limit in the cloud
+  mask product. Class 3 / no data is encoded as NaN.
 
 ## 14. Remaining items to verify
 

@@ -1,1 +1,19 @@
 volcano,start_date,end_date,source,notes
+Hekla,2000-02-26,2000-03-08,GVP 372070; Wikipedia List of volcanic eruptions in Iceland,before the SEVIRI archive; kept for completeness
+Grimsvotn,2004-11-01,2004-11-04,GVP 373010; Wikipedia List of volcanic eruptions in Iceland,
+Eyjafjallajokull (Fimmvorduhals),2010-03-20,2010-04-12,Wikipedia 2010 eruptions of Eyjafjallajokull,flank fissure phase; GVP 372020 treats 2010-03-20 to 2010-06-23 as one eruption
+Eyjafjallajokull (summit),2010-04-14,2010-06-23,GVP 372020; Wikipedia 2010 eruptions of Eyjafjallajokull,explosive summit phase; end date from GVP
+Grimsvotn,2011-05-21,2011-05-28,GVP 373010 (end 2011-05-25); Wikipedia 2011 eruption of Grimsvotn,end taken as 28 May (later of the two sources)
+Bardarbunga (Holuhraun),2014-08-29,2015-02-28,Wikipedia List of volcanic eruptions in Iceland; GVP 373030 (end 2015-02-27),
+Fagradalsfjall (Geldingadalir),2021-03-19,2021-09-18,GVP 371032; Wikipedia Fagradalsfjall,
+Fagradalsfjall (Meradalir),2022-08-03,2022-08-21,GVP 371032; Wikipedia Fagradalsfjall,
+Fagradalsfjall (Litli-Hrutur),2023-07-10,2023-08-05,GVP 371032; Wikipedia Fagradalsfjall,
+Sundhnukur 1,2023-12-18,2023-12-21,Wikipedia 2023-2025 Sundhnukur eruptions,end date from IMO reports; verify
+Sundhnukur 2,2024-01-14,2024-01-16,Wikipedia 2023-2025 Sundhnukur eruptions,end date from IMO reports; verify
+Sundhnukur 3,2024-02-08,2024-02-09,Wikipedia List of volcanic eruptions in Iceland,began 06:07 UTC; end date verify
+Sundhnukur 4,2024-03-16,2024-05-09,Wikipedia List of volcanic eruptions in Iceland,began 20:23 UTC; end date verify
+Sundhnukur 5,2024-05-29,2024-06-22,Wikipedia List of volcanic eruptions in Iceland,began 12:45 UTC; largest of the series to date
+Sundhnukur 6,2024-08-22,2024-09-06,Wikipedia List of volcanic eruptions in Iceland,began 21:25 UTC
+Sundhnukur 7,2024-11-20,2024-12-09,Wikipedia Sundhnukur,GVP 371020 gives 2024-12-08 as the end of the 2023-2024 sequence
+Sundhnukur 8,2025-04-01,2025-04-01,GVP 371020,lasted under a day
+Sundhnukur 9,2025-07-16,2025-08-05,Wikipedia List of volcanic eruptions in Iceland; GVP 371020,began 03:54 UTC
