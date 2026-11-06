@@ -112,6 +112,22 @@ class DataStoreClient:
             "size_kb": p.size,
         }
 
+    def download_access(self, product: Any) -> int:
+        """HTTP status of a (streamed, immediately closed) direct download of a product.
+
+        200 means the account may download it; 403 means it is not entitled (e.g. an
+        embargo on near-real-time data). No Data Tailor customisation is created.
+        """
+        import requests
+
+        url = self.datastore.urls.get(
+            "datastore",
+            "download product",
+            vars={"product_id": product._id, "collection_id": product.collection._id},
+        )
+        with requests.get(url, auth=self.token.auth, stream=True, timeout=60) as resp:
+            return resp.status_code
+
     # -- Data Tailor -------------------------------------------------------------------------
     def tailor(
         self,

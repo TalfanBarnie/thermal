@@ -236,6 +236,29 @@ def cmd_platforms(args) -> int:
     return 0
 
 
+def cmd_probe(args) -> int:
+    """Check direct download access to image products of various ages (embargo finder)."""
+    settings = config.load_settings()
+    sat = config.satellite(args.sat)
+    client = _client(settings)
+    now = datetime.now(UTC)
+    print(
+        "age_hours  nominal_time          product                                            status"
+    )
+    for age in args.ages:
+        t = now - timedelta(hours=age)
+        try:
+            p = client.product_at(sat["collection"], t, sat["cadence_minutes"])
+            if p is None:
+                print(f"{age:>8.1f}  {t:%Y-%m-%dT%H:%M}Z  (no product found)")
+                continue
+            status = client.download_access(p)
+            print(f"{age:>8.1f}  {t:%Y-%m-%dT%H:%M}Z  {str(p):<50} {status}")
+        except Exception as exc:
+            print(f"{age:>8.1f}  {t:%Y-%m-%dT%H:%M}Z  error: {exc}")
+    return 0
+
+
 def cmd_sample(args) -> int:
     """Draw a stratified training sample of timestamps, excluding eruption windows."""
     from .calendar import Calendar
@@ -338,6 +361,13 @@ def build_parser() -> argparse.ArgumentParser:
     pl.add_argument("--end", default=datetime.now(UTC).strftime("%Y-%m-%d"))
     pl.add_argument("--step-days", type=int, default=30)
     pl.set_defaults(func=cmd_platforms)
+
+    pb = sub.add_parser("probe", help="check download access to products by age")
+    pb.add_argument("--sat", default="msg-0deg")
+    pb.add_argument(
+        "--ages", type=float, nargs="*", default=[0.5, 1, 2, 3, 4, 6, 12, 24, 48, 72, 168]
+    )
+    pb.set_defaults(func=cmd_probe)
 
     sm = sub.add_parser("sample", help="draw a stratified training sample of timestamps")
     sm.add_argument("--sat", default="msg-0deg")

@@ -133,6 +133,11 @@ def _tailor_with_retries(
             return nc[0]
         except Exception as exc:  # Data Tailor is flaky; retry a couple of times
             last_exc = exc
+            if "403 Client Error" in str(exc):
+                raise RuntimeError(
+                    f"Data Store refused the download of {product} (403): the account is not "
+                    "entitled to this product, most likely a near-real-time embargo"
+                ) from exc
             log.warning("tailor attempt %d failed for %s: %s", attempt + 1, product, exc)
             if attempt < retries:
                 time.sleep(retry_wait_s * (attempt + 1))
