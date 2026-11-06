@@ -18,7 +18,7 @@ def make_cutout(
     rng = np.random.default_rng(seed)
     crs = CRS.from_proj4(f"+proj=geos +h={H} +lon_0=0 +sweep=y +a=6378137 +b=6356752.3 +units=m")
     fwd = Transformer.from_crs(CRS.from_epsg(4326), crs, always_xy=True)
-    x0, y0 = fwd.transform(-19.0, 65.0)
+    x0, y0 = fwd.transform(-22.2, 63.95)  # centred on the Reykjanes peninsula
     x = x0 + (np.arange(cols) - cols / 2) * 3000.0
     y = y0 + (rows / 2 - np.arange(rows)) * 3000.0  # north at the top (decreasing y)
     data = {}

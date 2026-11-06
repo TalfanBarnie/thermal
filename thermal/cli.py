@@ -158,6 +158,46 @@ def cmd_predict(args) -> int:
     return 0
 
 
+def cmd_process(args) -> int:
+    """Fetch, model and publish products and time series rows for one timestamp."""
+    from .live import ModelCache, process_timestamp
+
+    settings = config.load_settings()
+    sat = config.satellite(args.sat)
+    storage = Storage(settings)
+    out_dir = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix="thermal-"))
+    cache = ModelCache(storage, out_dir / "models")
+    result = process_timestamp(
+        _client(settings), storage, sat, parse_time(args.time), cache, out_dir, force=args.force
+    )
+    print(json.dumps(result, indent=1, default=str))
+    return 0 if result.get("ok") else 1
+
+
+def cmd_live(args) -> int:
+    """Catch up on new timestamps since the stored state and publish products."""
+    from .live import run_live
+
+    settings = config.load_settings()
+    storage = Storage(settings)
+    client = _client(settings)
+    rc = 0
+    for key in args.sats:
+        sat = config.satellite(key)
+        summary = run_live(
+            client,
+            storage,
+            sat,
+            lookback_hours=args.lookback_hours,
+            max_timestamps=args.max_timestamps,
+            force=args.force,
+        )
+        print(json.dumps(summary, indent=1, default=str))
+        if summary["errors"]:
+            rc = 1
+    return rc
+
+
 def raw_key_name(sat_key: str, t: datetime, kind: str) -> str:
     from .storage import raw_key
 
@@ -273,6 +313,20 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--out")
     pr.add_argument("--no-upload", action="store_true")
     pr.set_defaults(func=cmd_predict)
+
+    pc = sub.add_parser("process", help="fetch, model and publish one timestamp")
+    pc.add_argument("--sat", default="msg-0deg")
+    pc.add_argument("--time", required=True)
+    pc.add_argument("--out")
+    pc.add_argument("--force", action="store_true", help="re-process even if products exist")
+    pc.set_defaults(func=cmd_process)
+
+    lv = sub.add_parser("live", help="process new timestamps since the stored state")
+    lv.add_argument("--sats", nargs="*", default=["msg-0deg"])
+    lv.add_argument("--lookback-hours", type=float, default=6.0)
+    lv.add_argument("--max-timestamps", type=int, default=12)
+    lv.add_argument("--force", action="store_true")
+    lv.set_defaults(func=cmd_live)
 
     i = sub.add_parser("inspect", help="summarise local cutout files")
     i.add_argument("files", nargs="+")
