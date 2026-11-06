@@ -348,6 +348,7 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--sats", nargs="*", default=["msg-0deg"])
     lv.add_argument("--lookback-hours", type=float, default=6.0)
     lv.add_argument("--max-timestamps", type=int, default=12)
+    lv.add_argument("--min-age-minutes", type=float, default=None, help="default from config")
     lv.add_argument("--force", action="store_true")
     lv.set_defaults(func=cmd_live)
 

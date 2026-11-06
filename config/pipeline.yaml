@@ -6,3 +6,10 @@ datatailor:
 search:
   # half-width of the sensing-time window used when looking up a product at a nominal time
   tolerance_minutes: 20
+live:
+  # Image products younger than this are refused by the Data Store for this account
+  # (a ~1 hour near-real-time embargo, measured with `thermal probe` in M4), so the live
+  # loop only considers nominal times older than this.
+  min_age_minutes: 75
+  lookback_hours: 6
+  max_timestamps: 12

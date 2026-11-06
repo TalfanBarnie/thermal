@@ -82,3 +82,26 @@ def test_process_timestamp_end_to_end(tmp_path, monkeypatch):
     assert again.get("skipped") == "exists"
     arr = products.load_residual(storage, "msg-0deg", t)
     assert arr["flags"].dtype == np.uint8 and arr["residual"].shape == (12, 20)
+
+
+def test_candidate_window_respects_min_age(monkeypatch):
+    from datetime import timedelta
+
+    class P:
+        def __init__(self, end):
+            self.id = f"MSG3-SEVI-MSG15-0100-NA-{end:%Y%m%d%H%M%S}.000000000Z-NA"
+
+        def __str__(self):
+            return self.id
+
+    now = datetime(2026, 11, 6, 21, 22, tzinfo=UTC)
+    ends = [now - timedelta(minutes=m) for m in (20, 50, 80, 140, 200)]
+
+    class C:
+        def search(self, coll, start, end):
+            return [P(e) for e in ends]
+
+    sat = {"collection": "c", "cadence_minutes": 15}
+    got = live.candidate_times(C(), sat, now - timedelta(hours=3), now - timedelta(minutes=75))
+    assert all(t <= now - timedelta(minutes=75) for t in got)
+    assert len(got) == 3

@@ -1,5 +1,3 @@
-
-
 from tests.test_backfill import FakeStorage
 from thermal import timeseries
 

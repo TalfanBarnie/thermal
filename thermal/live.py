@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from . import anomaly, features, pipeline, products, regions, timeseries
+from . import anomaly, config, features, pipeline, products, regions, timeseries
 from .datastore import nominal_time
 from .model import BackgroundModel
 from .storage import Storage, raw_key, state_key
@@ -119,17 +119,25 @@ def run_live(
     *,
     lookback_hours: float = 6.0,
     max_timestamps: int = 12,
+    min_age_minutes: float | None = None,
     now: datetime | None = None,
     force: bool = False,
 ) -> dict[str, Any]:
-    """Process every new timestamp since the stored state (bounded), then update state and index."""
+    """Process every new timestamp since the stored state (bounded), then update state and index.
+
+    Only nominal times at least `min_age_minutes` old are considered, because the Data
+    Store refuses near-real-time image downloads for this account.
+    """
     now = now or datetime.now(UTC)
+    if min_age_minutes is None:
+        min_age_minutes = config.pipeline().get("live", {}).get("min_age_minutes", 75)
+    end = now - timedelta(minutes=min_age_minutes)
     state = storage.private.get_json(state_key(sat["key"]), default={}) or {}
     last = state.get("last_time")
     start = now - timedelta(hours=lookback_hours)
     if last:
         start = max(start, datetime.fromisoformat(last).astimezone(UTC) + timedelta(minutes=1))
-    times = candidate_times(client, sat, start, now)
+    times = candidate_times(client, sat, start, end)
     todo = [t for t in times if force or not product_exists(storage, sat, t)][-max_timestamps:]
     log.info(
         "%s: %d candidates since %s, %d to process",
