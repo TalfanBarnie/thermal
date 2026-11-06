@@ -1,0 +1,14 @@
+name: scrape eruption tables
+# Prints Wikipedia and Global Volcanism Program eruption tables for Iceland into the
+# job log, to be curated by hand into data/eruptions.csv.
+on:
+  workflow_dispatch:
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/scrape_eruptions.py

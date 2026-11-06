@@ -44,6 +44,11 @@ def summarise(path: Path) -> dict[str, Any]:
                 if finite.any():
                     entry["min"] = float(np.nanmin(vals))
                     entry["max"] = float(np.nanmax(vals))
+                    uniq, counts = np.unique(vals[finite], return_counts=True)
+                    if uniq.size <= 16:
+                        entry["value_counts"] = {
+                            str(u): int(c) for u, c in zip(uniq, counts, strict=True)
+                        }
             out["variables"][name] = entry
         try:
             lat, lon, method = geo.geolocate(ds)
