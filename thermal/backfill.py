@@ -138,15 +138,15 @@ def run_backfill(
         report = pipeline.fetch_timestamp(
             client, storage, sat, t, out_dir, cloudmask=cloudmask, summarise=False
         )
-        info: dict[str, Any] = {"ok": report["ok"]}
+        # In fetch mode the image is what matters; a missing cloud mask is recorded, not fatal.
         l15 = report["products"].get("l15", {})
+        info: dict[str, Any] = {"ok": "error" not in l15}
         if "product" in l15:
             info["platform"] = l15["product"].get("satellite")
             info["product_id"] = l15["product"].get("id")
-        if not report["ok"]:
-            info["errors"] = {
-                k: v.get("error") for k, v in report["products"].items() if "error" in v
-            }
+        errors = {k: v.get("error") for k, v in report["products"].items() if "error" in v}
+        if errors:
+            info["errors"] = errors
         _cleanup(out_dir)
         return ts, info
 

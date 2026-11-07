@@ -495,9 +495,12 @@ eruption in progress). Resolved items:
   2023-03-20), stratified over month and hour, eruption windows excluded
   with the 30 day buffer. The 2013 to 2018 Meteosat-10 era is a reserve
   source of extra MSG3 training data if needed.
-- **Data Tailor throughput**: ~2.5 min per timestamp (image plus cloud
-  mask) sequentially; the backfill workflow runs 2 customisations at a time
-  in 330 minute slices and resumes from state in the private bucket.
+- **Data Tailor throughput and cap**: the account allows 3 queued+running
+  customisations in total across all jobs ("exceeding your maximum number 3"
+  otherwise). Measured with that cap saturated: ~50 s per customisation, so
+  ~108 timestamps (image plus cloud mask) per hour in total. The backfill
+  workflow runs in 330 minute slices and resumes from state in the private
+  bucket; the concurrencies of all running jobs must sum to at most 3.
 - **Eruption calendar**: `data/eruptions.csv`, 18 rows, from the GVP web
   service and Wikipedia wikitext via `scripts/scrape_eruptions.py`.
 
