@@ -1,7 +1,7 @@
 datatailor:
   format: netcdf4
   poll_seconds: 15
-  timeout_seconds: 1800
+  timeout_seconds: 900   # a customisation stuck longer than this is abandoned and retried
   # The Data Tailor web service allows this account 3 queued+running customisations in
   # total, across every job and workflow. Keep the sum of all running jobs' concurrency
   # at or below this; above it, submissions fail with "exceeding your maximum number".

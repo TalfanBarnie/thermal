@@ -443,7 +443,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--start")
     b.add_argument("--end")
     b.add_argument("--step-minutes", type=int, default=60)
-    b.add_argument("--max-minutes", type=float, default=330.0, help="wall-clock budget")
+    b.add_argument("--max-minutes", type=float, default=300.0, help="wall-clock budget")
     b.add_argument("--concurrency", type=int, default=2)
     b.add_argument("--no-cloudmask", action="store_true")
     b.add_argument("--summary-json", help="write the run summary to this file")

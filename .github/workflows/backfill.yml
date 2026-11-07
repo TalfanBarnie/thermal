@@ -23,8 +23,8 @@ on:
         description: cadence when no list is given
         default: "60"
       max_minutes:
-        description: wall-clock budget for this run
-        default: "330"
+        description: wall-clock budget for submitting work (in-flight customisations may add up to 15 min)
+        default: "300"
       concurrency:
         description: simultaneous Data Tailor customisations
         default: "2"
@@ -82,7 +82,8 @@ jobs:
           fi
           echo "remaining=$(python -c "import json;print(json.load(open('$RUNNER_TEMP/summary.json'))['remaining'])")" >> "$GITHUB_OUTPUT"
       - name: re-dispatch while work remains
-        if: ${{ inputs.chain && steps.backfill.outputs.remaining != '0' }}
+        # Runs even if the job was cancelled by its timeout: a missing summary counts as "work remains".
+        if: ${{ always() && inputs.chain && steps.backfill.outputs.remaining != '0' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
