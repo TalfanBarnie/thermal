@@ -18,7 +18,7 @@ from typing import Any
 
 from . import pipeline, timeseries
 from .redact import redact
-from .storage import Storage
+from .storage import Storage, raw_key
 
 log = logging.getLogger(__name__)
 
@@ -81,12 +81,15 @@ def run_backfill(
     force: bool = False,
     sat_config: dict[str, Any] | None = None,
     grace_minutes: float = 10.0,
+    only_stored: bool = False,
 ) -> dict[str, Any]:
     """Run every timestamp not yet done, within a wall-clock budget. Returns a summary.
 
     mode "fetch": store raw cutouts only. mode "process": fetch (or reuse), apply the
     background model, and publish products and time series rows; with force=True existing
-    products are re-made (used after a retrain). State is per job id and resumable.
+    products are re-made (used after a retrain). With only_stored=True, timestamps whose
+    image cutout is not yet in the bucket are left for later instead of fetched (no Data
+    Tailor use at all). State is per job id and resumable.
     """
     if mode not in ("fetch", "process"):
         raise ValueError(f"unknown mode {mode}")
@@ -106,6 +109,12 @@ def run_backfill(
         if not state.is_done(t.strftime("%Y%m%dT%H%M%S"))
         and state.attempts(t.strftime("%Y%m%dT%H%M%S")) < max_attempts
     ]
+    skipped_unstored = 0
+    if only_stored:
+        have = set(storage.private.list_keys(f"raw/{sat['key']}/"))
+        kept = [t for t in todo if raw_key(sat["key"], t, "l15") in have]
+        skipped_unstored = len(todo) - len(kept)
+        todo = kept
     log.info(
         "backfill %s: %d timestamps, %d to do, budget %.0f min, concurrency %d",
         job_id,
@@ -230,6 +239,7 @@ def run_backfill(
         "requested": len(timestamps),
         "processed_this_run": processed,
         "stopped_for_time": stopped_for_time,
+        "skipped_unstored": skipped_unstored,
         "remaining": len(
             [
                 t

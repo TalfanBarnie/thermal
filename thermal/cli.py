@@ -358,6 +358,7 @@ def cmd_backfill(args) -> int:
         cloudmask=not args.no_cloudmask,
         mode=args.mode,
         force=args.force,
+        only_stored=args.only_stored,
     )
     print(json.dumps(summary, indent=1))
     if args.summary_json:
@@ -460,6 +461,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="fetch raw cutouts only, or also model and publish products",
     )
     b.add_argument("--force", action="store_true", help="process: re-make existing products")
+    b.add_argument(
+        "--only-stored",
+        action="store_true",
+        help="skip timestamps whose cutout is not in the bucket yet (no Data Tailor)",
+    )
     b.set_defaults(func=cmd_backfill)
 
     va = sub.add_parser("validate", help="onset detection against the calendar from public shards")

@@ -41,6 +41,10 @@ on:
         description: process mode only, re-make products that already exist
         type: boolean
         default: false
+      only_stored:
+        description: skip timestamps whose cutout is not in the bucket yet (no Data Tailor use)
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: write
@@ -69,7 +73,7 @@ jobs:
       - name: backfill
         id: backfill
         run: |
-          EXTRA="--mode ${{ inputs.mode || 'fetch' }} ${{ inputs.force && '--force' || '' }}"
+          EXTRA="--mode ${{ inputs.mode || 'fetch' }} ${{ inputs.force && '--force' || '' }} ${{ inputs.only_stored && '--only-stored' || '' }}"
           if [ -n "${{ inputs.list }}" ]; then
             thermal backfill --sat "${{ inputs.sat }}" --job-id "${{ inputs.job_id }}" \
               --list "${{ inputs.list }}" --max-minutes "${{ inputs.max_minutes }}" \
@@ -92,3 +96,4 @@ jobs:
           -f start="${{ inputs.start }}" -f end="${{ inputs.end }}" -f step_minutes="${{ inputs.step_minutes }}"
           -f max_minutes="${{ inputs.max_minutes }}" -f concurrency="${{ inputs.concurrency }}" -f chain=true
           -f mode="${{ inputs.mode || 'fetch' }}" -f force=${{ inputs.force && 'true' || 'false' }}
+          -f only_stored=${{ inputs.only_stored && 'true' || 'false' }}

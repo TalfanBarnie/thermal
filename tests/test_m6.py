@@ -75,3 +75,34 @@ def test_backfill_process_mode(monkeypatch):
     assert storage.public.get_json("index.json")["sources"]["msg-0deg"]["regions"] == {
         "reykjanes": {"months": []}
     }
+
+
+def test_backfill_only_stored(monkeypatch):
+    from tests.test_backfill import FakeStorage
+    from thermal.storage import raw_key
+
+    storage = FakeStorage()
+    ts = [datetime(2024, 1, 1, h, tzinfo=UTC) for h in range(3)]
+    stored = raw_key("msg-0deg", ts[1], "l15")
+    # FakeStorage shares one bucket object for private and public
+    storage.private.list_keys = lambda prefix, max_keys=None: (
+        [stored] if prefix.startswith("raw/") else []
+    )
+    sat = {
+        "key": "msg-0deg",
+        "cadence_minutes": 15,
+        "collection": "c",
+        "tailor_product": "p",
+        "monitoring_regions": [],
+    }
+    calls = []
+    monkeypatch.setattr(
+        live,
+        "process_timestamp",
+        lambda c, s_, sat_, t, cache, out, force=False: (calls.append(t), {"ok": True})[1],
+    )
+    monkeypatch.setattr(live, "ModelCache", lambda s_, d: None)
+    s = backfill.run_backfill(
+        None, storage, sat, ts, "p", max_minutes=5, concurrency=1, mode="process", only_stored=True
+    )
+    assert calls == [ts[1]] and s["skipped_unstored"] == 2 and s["done"] == 1
