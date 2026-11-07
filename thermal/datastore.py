@@ -11,6 +11,7 @@ from typing import Any
 
 from . import config
 from .config import Settings
+from .redact import redact
 
 log = logging.getLogger(__name__)
 
@@ -158,9 +159,9 @@ class DataStoreClient:
                 customisation, dt_cfg["poll_seconds"], dt_cfg["timeout_seconds"]
             )
             try:
-                logtext = customisation.logfile
+                logtext = redact(customisation.logfile)
             except Exception as exc:  # log retrieval is best-effort
-                logtext = f"<log unavailable: {exc}>"
+                logtext = redact(f"<log unavailable: {exc}>")
             if status in TAILOR_FAILED:
                 raise RuntimeError(
                     f"Data Tailor customisation {customisation} {status}:\n{logtext}"

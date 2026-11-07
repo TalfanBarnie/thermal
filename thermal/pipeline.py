@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from . import inspect, regions, render
+from .redact import redact
 from .storage import Storage, fetch_report_key, quicklook_key, raw_key
 
 log = logging.getLogger(__name__)
@@ -103,7 +104,7 @@ def fetch_timestamp(
                         info["public_url"] = storage.public_url_for(qkey)
         except Exception as exc:
             report["ok"] = False
-            entry["error"] = f"{type(exc).__name__}: {exc}"
+            entry["error"] = redact(f"{type(exc).__name__}: {exc}")
             log.exception("%s %s %s failed", sat["key"], t.isoformat(), kind)
     if storage is not None:
         storage.private.put_json(fetch_report_key(sat["key"], t), report)

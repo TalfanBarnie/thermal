@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from . import pipeline, timeseries
+from .redact import redact
 from .storage import Storage
 
 log = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class BackfillState:
         with self._lock:
             entry = self.data["failed"].setdefault(ts, {"attempts": 0})
             entry["attempts"] += 1
-            entry["error"] = error[:500]
+            entry["error"] = redact(error)[:500]
             entry["at"] = datetime.now(UTC).isoformat()
 
     def save(self) -> None:

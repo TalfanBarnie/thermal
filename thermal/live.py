@@ -13,6 +13,7 @@ from typing import Any
 from . import anomaly, config, features, pipeline, products, regions, timeseries
 from .datastore import nominal_time
 from .model import BackgroundModel
+from .redact import redact
 from .storage import Storage, state_key
 
 log = logging.getLogger(__name__)
@@ -155,7 +156,11 @@ def run_live(
             r = process_timestamp(client, storage, sat, t, model_cache, out_dir, force=force)
         except Exception as exc:
             log.exception("%s failed", t.isoformat())
-            r = {"time": t.isoformat(), "ok": False, "error": f"{type(exc).__name__}: {exc}"}
+            r = {
+                "time": t.isoformat(),
+                "ok": False,
+                "error": redact(f"{type(exc).__name__}: {exc}"),
+            }
         results.append(r)
         if r.get("ok"):
             state["last_time"] = max(state.get("last_time", ""), t.isoformat())

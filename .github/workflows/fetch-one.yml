@@ -41,7 +41,7 @@ jobs:
           cache: pip
       - run: pip install -e .
       - run: >
-          thermal -v fetch --sat "${{ inputs.sat }}" --time "${{ inputs.time }}"
+          thermal fetch --sat "${{ inputs.sat }}" --time "${{ inputs.time }}"
           --out "$RUNNER_TEMP/fetch" --quicklook ${{ inputs.upload == false && '--no-upload' || '' }}
       - name: print quicklooks (base64) for inspection without artifact access
         if: ${{ inputs.print_quicklooks }}

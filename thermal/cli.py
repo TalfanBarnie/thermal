@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 
 from . import config, inspect, pipeline, sampling
+from .redact import redact
 from .storage import Storage
 
 log = logging.getLogger("thermal")
@@ -86,8 +87,9 @@ def cmd_fetch(args) -> int:
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path = out_dir / f"fetch_{sat['key']}_{t:%Y%m%dT%H%M%S}.json"
-    report_path.write_text(json.dumps(report, indent=1, default=str))
-    print(json.dumps(report, indent=1, default=str))
+    text = redact(json.dumps(report, indent=1, default=str))
+    report_path.write_text(text)
+    print(text)
     print(f"report written to {report_path}")
     return 0 if report["ok"] else 1
 
@@ -170,7 +172,7 @@ def cmd_process(args) -> int:
     result = process_timestamp(
         _client(settings), storage, sat, parse_time(args.time), cache, out_dir, force=args.force
     )
-    print(json.dumps(result, indent=1, default=str))
+    print(redact(json.dumps(result, indent=1, default=str)))
     return 0 if result.get("ok") else 1
 
 
@@ -192,7 +194,7 @@ def cmd_live(args) -> int:
             max_timestamps=args.max_timestamps,
             force=args.force,
         )
-        print(json.dumps(summary, indent=1, default=str))
+        print(redact(json.dumps(summary, indent=1, default=str)))
         if summary["errors"]:
             rc = 1
     return rc
@@ -483,6 +485,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     for noisy in ("botocore", "boto3", "urllib3", "s3transfer", "charset_normalizer"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+    from .redact import install
+
+    install()
     return args.func(args)
 
 
