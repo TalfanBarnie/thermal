@@ -40,10 +40,18 @@ def nominal_time(sensing_end: datetime, cadence_minutes: int) -> datetime:
 
 
 def wait_for_customisation(
-    customisation: Any, poll_seconds: float, timeout_seconds: float, sleep=time.sleep
+    customisation: Any,
+    poll_seconds: float,
+    timeout_seconds: float,
+    sleep=time.sleep,
+    deadline: float | None = None,
 ) -> str:
-    """Poll a Data Tailor customisation until it finishes. Returns the final status."""
-    deadline = time.monotonic() + timeout_seconds
+    """Poll a Data Tailor customisation until it finishes. Returns the final status.
+
+    `deadline` is an absolute time.monotonic() value that caps the wait regardless of
+    timeout_seconds, so a batch run can stop on time.
+    """
+    deadline = min(time.monotonic() + timeout_seconds, deadline or float("inf"))
     status = customisation.status
     while status not in TAILOR_DONE | TAILOR_FAILED:
         if time.monotonic() > deadline:
@@ -138,6 +146,7 @@ class DataStoreClient:
         out_dir: Path,
         fmt: str | None = None,
         projection: str | None = None,
+        deadline: float | None = None,
     ) -> TailorResult:
         """Run one Data Tailor customisation and download its outputs into out_dir.
 
@@ -156,7 +165,7 @@ class DataStoreClient:
         customisation = self.datatailor.new_customisation(product, chain)
         try:
             status = wait_for_customisation(
-                customisation, dt_cfg["poll_seconds"], dt_cfg["timeout_seconds"]
+                customisation, dt_cfg["poll_seconds"], dt_cfg["timeout_seconds"], deadline=deadline
             )
             try:
                 logtext = redact(customisation.logfile)

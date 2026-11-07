@@ -42,8 +42,11 @@ def fetch_timestamp(
     summarise: bool = True,
     retries: int = 2,
     retry_wait_s: float = 30.0,
+    deadline: float | None = None,
 ) -> dict[str, Any]:
     """Fetch (or reuse) the cutouts for one nominal time. Returns the fetch report.
+
+    `deadline` (time.monotonic()) bounds every wait and retry so batch runs end on time.
 
     The report has report["ok"] False if any kind failed; per-kind errors are in
     report["products"][kind]["error"]. Raw cutouts are stored in the private bucket
@@ -111,8 +114,22 @@ def fetch_timestamp(
     return report
 
 
+def _past(deadline: float | None) -> bool:
+    return deadline is not None and time.monotonic() > deadline
+
+
 def _tailor_with_retries(
-    client, sat, t, coll_id, tailor_product, roi, out_dir, entry, retries, retry_wait_s
+    client,
+    sat,
+    t,
+    coll_id,
+    tailor_product,
+    roi,
+    out_dir,
+    entry,
+    retries,
+    retry_wait_s,
+    deadline=None,
 ) -> Path:
     product = client.product_at(
         coll_id, t, sat["cadence_minutes"], platform=sat.get("platform_filter")
@@ -126,8 +143,10 @@ def _tailor_with_retries(
         try:
             waited = 0.0
             while True:
+                if _past(deadline):
+                    raise TimeoutError("batch deadline reached before the customisation ran")
                 try:
-                    result = client.tailor(product, tailor_product, roi, out_dir)
+                    result = client.tailor(product, tailor_product, roi, out_dir, deadline=deadline)
                     break
                 except Exception as exc:
                     # The account's queued+running cap is a transient condition, not a failure:
@@ -154,6 +173,8 @@ def _tailor_with_retries(
                     "entitled to this product, most likely a near-real-time embargo"
                 ) from exc
             log.warning("tailor attempt %d failed for %s: %s", attempt + 1, product, exc)
+            if _past(deadline):
+                break
             if attempt < retries:
                 time.sleep(retry_wait_s * (attempt + 1))
     raise RuntimeError(f"Data Tailor failed after {retries + 1} attempts: {last_exc}")

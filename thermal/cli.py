@@ -362,6 +362,12 @@ def cmd_backfill(args) -> int:
     print(json.dumps(summary, indent=1))
     if args.summary_json:
         Path(args.summary_json).write_text(json.dumps(summary))
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if summary.get("abandoned_in_flight"):
+        import os
+
+        os._exit(0)  # worker threads abandoned at the deadline must not keep the job alive
     return 0
 
 
@@ -485,9 +491,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     for noisy in ("botocore", "boto3", "urllib3", "s3transfer", "charset_normalizer"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+    from .netguard import install_default_timeout
     from .redact import install
 
     install()
+    install_default_timeout()
     return args.func(args)
 
 

@@ -80,6 +80,7 @@ def run_backfill(
     mode: str = "fetch",
     force: bool = False,
     sat_config: dict[str, Any] | None = None,
+    grace_minutes: float = 10.0,
 ) -> dict[str, Any]:
     """Run every timestamp not yet done, within a wall-clock budget. Returns a summary.
 
@@ -96,6 +97,8 @@ def run_backfill(
 
         model_cache = ModelCache(storage, Path(tempfile.mkdtemp(prefix="models-")))
     deadline = time.monotonic() + max_minutes * 60.0
+    # No wait, retry or poll continues past this: the slice must end before the job timeout.
+    hard_deadline = deadline + grace_minutes * 60.0
     started = datetime.now(UTC)
     todo = [
         t
@@ -137,7 +140,14 @@ def run_backfill(
         if pipeline.already_stored(storage, sat, t, cloudmask):
             return ts, {"ok": True, "reused": True}
         report = pipeline.fetch_timestamp(
-            client, storage, sat, t, out_dir, cloudmask=cloudmask, summarise=False
+            client,
+            storage,
+            sat,
+            t,
+            out_dir,
+            cloudmask=cloudmask,
+            summarise=False,
+            deadline=hard_deadline,
         )
         # In fetch mode the image is what matters; a missing cloud mask is recorded, not fatal.
         l15 = report["products"].get("l15", {})
@@ -151,7 +161,9 @@ def run_backfill(
         _cleanup(out_dir)
         return ts, info
 
-    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+    abandoned = 0
+    pool = ThreadPoolExecutor(max_workers=concurrency)
+    try:
         pending = set()
         queue = list(todo)
         while queue or pending:
@@ -163,7 +175,14 @@ def run_backfill(
                 pending.add(pool.submit(work, queue.pop(0)))
             if not pending:
                 break
-            for fut in as_completed(list(pending)):
+            remaining_s = hard_deadline + 60.0 - time.monotonic()
+            if remaining_s <= 0:
+                abandoned = len(pending)
+                log.warning(
+                    "hard deadline reached with %d timestamps in flight; abandoning", abandoned
+                )
+                break
+            for fut in as_completed(list(pending), timeout=remaining_s):
                 pending.discard(fut)
                 try:
                     ts, info = fut.result()
@@ -177,7 +196,21 @@ def run_backfill(
                 processed += 1
                 if processed % save_every == 0:
                     state.save()
+                    log.info(
+                        "progress %s: %s, %d this run, %d queued, %d in flight, %.0f min left",
+                        job_id,
+                        state.summary(),
+                        processed,
+                        len(queue),
+                        len(pending),
+                        max(0.0, (deadline - time.monotonic()) / 60.0),
+                    )
                 break  # go back to topping up the queue
+    except TimeoutError:
+        abandoned = len(pending)
+        log.warning("hard deadline reached with %d timestamps in flight; abandoning", abandoned)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     state.data["runs"].append(
         {
@@ -185,6 +218,7 @@ def run_backfill(
             "finished": datetime.now(UTC).isoformat(),
             "processed": processed,
             "stopped_for_time": stopped_for_time,
+            "abandoned_in_flight": abandoned,
         }
     )
     state.save()
