@@ -121,9 +121,22 @@ def _tailor_with_retries(
         raise RuntimeError(f"no product found in {coll_id} near {t.isoformat()}")
     entry["product"] = client.product_summary(product)
     last_exc: Exception | None = None
+    cap_wait_s = 900.0  # how long to keep waiting for a free Data Tailor slot
     for attempt in range(retries + 1):
         try:
-            result = client.tailor(product, tailor_product, roi, out_dir)
+            waited = 0.0
+            while True:
+                try:
+                    result = client.tailor(product, tailor_product, roi, out_dir)
+                    break
+                except Exception as exc:
+                    # The account's queued+running cap is a transient condition, not a failure:
+                    # wait for a slot instead of spending a retry on it.
+                    if "exceeding your maximum number" in str(exc) and waited < cap_wait_s:
+                        time.sleep(20.0)
+                        waited += 20.0
+                        continue
+                    raise
             entry["customisation"] = {
                 "id": result.customisation_id,
                 "duration_s": round(result.duration_s, 1),
