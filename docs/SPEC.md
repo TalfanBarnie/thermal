@@ -419,6 +419,55 @@ Model sketch, fitted jointly across eruptions:
 Outputs: posterior effusion rate curves per eruption, the shared
 radiance-to-effusion coefficient, and the cooling kernel.
 
+### Parked design notes (2026-11-08, to revisit after the eruption backfill)
+
+Recorded from discussion so they are not lost; none of this is scheduled.
+
+- **Daytime model error** is mostly reflected sunlight at 3.9 µm, which
+  depends on cloud droplet size and phase and on snow grain size, none of
+  which the other channels determine. Candidate improvements, in order:
+  give the model the emission term `B_3.9(T_10.8)` explicitly; add
+  normalised reflectances and a cos(sza)-scaled 3.9 µm solar term; add
+  scattering and glint angles; train on clear pixels only. Diagnose first by
+  splitting the daytime residual by cloud mask class, snow index and
+  scattering angle (the stored residuals and masks suffice).
+- **Multi-channel anomalies.** For a 1000 K component the 10.8 µm anomaly
+  passes about 2 K at a hot fraction of 0.001, where 3.9 µm has already
+  saturated; night-time 1.6 µm responds only above about 800 K and has a
+  near-zero background. Plan: 10.8 µm (and night 1.6 µm) as extra model
+  targets or a contextual ring background, then a per-pixel Planck-mixture
+  (Dozier) fit for hot area, temperature and radiant power, replacing the
+  fixed MIR constant. Independent component analysis was considered and
+  rejected: the lava endmember is a family of Planck curves, not a spectrum.
+- **Architecture.** Keep the background-prediction formulation. Possible
+  upgrades: a small convolutional multi-target background model (spatial
+  context, inpainting with channel masking); a physics-based decoder with
+  per-pixel latents (background T, hot fraction, hot T, reflectance) through
+  Planck plus the point spread function, trained with a sparsity prior.
+- **Area-age effusion model.** Radiance in channel λ is the emplacement
+  rate convolved with an effective kernel
+  `k_λ(a) = S(a) [B_λ(T(a)) − B_λ(T_bg)]` (survival times Planck of the
+  cooling curve). Three channels probe three age windows and their ratios
+  fix `T(a)` independently of area. Post-eruption decay tails are the kernel
+  calibration data. Hierarchical Stan model over eruptions; saturation as
+  censoring, cloud as missing, background variance in the likelihood; the
+  dated photogrammetric volumes (Fagradalsfjall 2021 especially) break the
+  degeneracy between emplacement rate and kernel. A PINN is not the right
+  tool; a grey-box model with a learned closure for the exposed-hot
+  fraction is.
+- **Sub-pixel localisation.** The footprint at Reykjanes is about 3 km
+  east–west and 9–10 km north–south, so centroiding resolves the east/west
+  side of the Sundhnúkur drainage divide well. Forward model: fissure
+  segment (start, end along the crater row, discretised and marginalised in
+  Stan), a topography-filling flow model (MOLASSES or priority-flood fill
+  with a residual thickness; planform a function of cumulative volume only)
+  giving inundation order, then cell ages, kernel radiances and the point
+  spread function. Nuisances: per-image geolocation offset, spread width,
+  emissivity and transmission, cooling and closure parameters. Needs the
+  pre-eruption DEM for each episode and the 15 minute cadence for the first
+  day of each Sundhnúkur episode (add to the fetch list later). Published
+  lava outlines per episode are the ground truth.
+
 ## 12. Milestones
 
 | # | Milestone | Done when |
