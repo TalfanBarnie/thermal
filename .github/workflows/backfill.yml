@@ -48,6 +48,12 @@ on:
 permissions:
   contents: read
   actions: write
+# Process-mode runs share the "live" group with the hourly live workflow so that two jobs
+# never read-modify-write the same time series shard at once; fetch-mode runs serialise
+# per job id so a job cannot accidentally run twice.
+concurrency:
+  group: ${{ inputs.mode == 'process' && 'live' || format('backfill-{0}', inputs.job_id) }}
+  cancel-in-progress: false
 jobs:
   backfill:
     runs-on: ubuntu-latest
