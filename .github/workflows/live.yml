@@ -2,8 +2,10 @@ name: live
 # Hourly catch-up: fetch every new image since the stored state (bounded), apply the background
 # model, and publish anomaly products and time series rows for the web app.
 on:
-  schedule:
-    - cron: "17 * * * *"
+  # Hourly schedule disabled while the eruption-window backfill uses the Actions budget.
+  # Re-enable by restoring:
+  #   schedule:
+  #     - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       sats:
