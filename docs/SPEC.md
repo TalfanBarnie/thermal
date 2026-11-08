@@ -625,9 +625,32 @@ slice ran in date order; later slices run in a fixed shuffled order).
   eruption the first sample above a threshold and its delay from the
   calendar start, false alarms outside the buffered windows, and exports one
   CSV per eruption window for the effusion-rate analysis.
-- Pending: retrain both eras on the full samples, choose the candidates,
-  process the eruption windows and reprocess the live rows, then run the
-  validation and record the results here.
+- **Preview (2026-11-08)**: the 162 eruption-window cutouts fetched before
+  the pause were processed with the full Meteosat-10 MLP (`--only-stored`,
+  about 140 of them in the Meteosat-10 era). `thermal validate` with
+  max_z >= 4, delays counted from 00:00 UTC on the calendar start date:
+
+  | Eruption | Samples | Hits | First hit | Peak z |
+  |---|---|---|---|---|
+  | Litli-Hrútur 2023-07-10 | 22 | 6 | 2023-07-11 09:00 | 98 |
+  | Sundhnúkur 1, 2023-12-18 | 9 | 2 | 2023-12-19 03:00 | 239 |
+  | Sundhnúkur 2, 2024-01-14 | 8 | 0 | none | 3.8 |
+  | Sundhnúkur 3, 2024-02-08 | 5 | 3 | 2024-02-08 09:00 | 518 |
+  | Sundhnúkur 4, 2024-03-16 | 30 | 11 | 2024-03-16 22:00 | 68 |
+  | Sundhnúkur 5, 2024-05-29 | 16 | 5 | 2024-05-29 14:00 | 55 |
+  | Sundhnúkur 6, 2024-08-22 | 12 | 4 | 2024-08-23 21:00 | 26 |
+  | Sundhnúkur 7, 2024-11-20 | 14 | 4 | 2024-11-21 01:00 | 1010 |
+  | Sundhnúkur 8, 2025-04-01 | 1 | 0 | none (only sample is pre-onset) | 1.3 |
+  | Sundhnúkur 9, 2025-07-16 | 25 | 5 | 2025-07-16 15:00 | 24 |
+
+  No false alarms in 70 quiet samples. Sundhnúkur 2 (two days, January,
+  8 sparse samples) peaked at z 3.8, just under the threshold; the dense
+  hourly onset sampling of the full fetch is what that case needs.
+- The hourly `live` schedule has in fact been running since 2026-11-06
+  because this branch is the repository's default branch; its early rows
+  used the smoke model and are being reprocessed with the full model.
+- Pending: train the Meteosat-11 era, fetch and process the remaining
+  3,800 eruption-window timestamps, then the full validation.
 
 ## 19. Remaining items to verify
 
