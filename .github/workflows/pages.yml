@@ -3,7 +3,7 @@ name: pages
 # in the repository settings. Runs on pushes to the default branch and on manual dispatch.
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, claude/stoic-wright-lfm0jf]
     paths: ["web/**", "data/eruptions.csv", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
