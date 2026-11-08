@@ -54,14 +54,21 @@ def fit_ridge_poly(
     platform: str,
     degree: int = 2,
     alpha: float = 1.0,
+    max_rows: int = 300_000,
+    seed: int = 0,
 ) -> dict[str, Any]:
+    """Polynomial ridge. The degree-2 design matrix has ~n_features^2/2 columns, so the fit
+    uses at most `max_rows` random rows (in float32) to keep memory within a CI runner."""
     from sklearn.linear_model import Ridge
 
     x_mean, x_std, y_mean, y_std = standardise(X, y)
-    xs = (X - x_mean) / x_std
-    ys = (y - y_mean) / y_std
+    if X.shape[0] > max_rows:
+        take = np.random.default_rng(seed).choice(X.shape[0], max_rows, replace=False)
+        X, y = X[take], y[take]
+    xs = ((X - x_mean) / x_std).astype(np.float32)
+    ys = ((y - y_mean) / y_std).astype(np.float32)
     powers = monomial_powers(X.shape[1], degree)
-    P = poly_features(xs, powers)
+    P = poly_features(xs, powers).astype(np.float32)
     p_mean, p_std = P.mean(axis=0), P.std(axis=0)
     p_std[p_std < 1e-8] = 1.0
     Pn = (P - p_mean) / p_std

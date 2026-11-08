@@ -27,7 +27,7 @@ def gelu_tanh(x: np.ndarray) -> np.ndarray:
 
 def poly_features(xs: np.ndarray, powers: np.ndarray) -> np.ndarray:
     """Monomial expansion: column j is prod_i xs[:, i] ** powers[j, i]."""
-    out = np.ones((xs.shape[0], powers.shape[0]), dtype=np.float64)
+    out = np.ones((xs.shape[0], powers.shape[0]), dtype=xs.dtype)
     for j, p in enumerate(powers):
         for i, e in enumerate(p):
             if e:
@@ -73,15 +73,24 @@ class BackgroundModel:
             return mean, logvar
         raise ValueError(f"unknown model type {self.model_type}")
 
-    def predict(self, X: np.ndarray, feature_names: list[str] | None = None):
-        """Return (mean, std) in target units for a feature matrix (n, n_features)."""
+    def predict(self, X: np.ndarray, feature_names: list[str] | None = None, chunk: int = 200_000):
+        """Return (mean, std) in target units for a feature matrix (n, n_features).
+
+        Rows are processed in chunks so that the polynomial expansion of the ridge model
+        never has to be materialised for millions of rows at once.
+        """
         if feature_names is not None and feature_names != self.feature_names:
             raise ValueError("feature order mismatch between cutout and model")
-        xs = (np.asarray(X, dtype=np.float64) - self.x_mean) / self.x_std
-        mean_s, logvar_s = self._forward_std(xs)
-        logvar_s = np.clip(logvar_s, LOGVAR_MIN, LOGVAR_MAX)
-        mean = mean_s * self.y_std + self.y_mean
-        std = np.exp(0.5 * logvar_s) * self.y_std
+        X = np.asarray(X)
+        n = X.shape[0]
+        mean = np.empty(n, dtype=np.float64)
+        std = np.empty(n, dtype=np.float64)
+        for i in range(0, n, chunk):
+            xs = (X[i : i + chunk].astype(np.float64) - self.x_mean) / self.x_std
+            mean_s, logvar_s = self._forward_std(xs)
+            logvar_s = np.clip(logvar_s, LOGVAR_MIN, LOGVAR_MAX)
+            mean[i : i + chunk] = mean_s * self.y_std + self.y_mean
+            std[i : i + chunk] = np.exp(0.5 * logvar_s) * self.y_std
         return mean, std
 
 
