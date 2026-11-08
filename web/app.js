@@ -4,6 +4,7 @@
   "use strict";
   const CFG = window.THERMAL_CONFIG;
   const $ = (id) => document.getElementById(id);
+  const PLATFORM_NAME = { MSG1: "Meteosat-8", MSG2: "Meteosat-9", MSG3: "Meteosat-10", MSG4: "Meteosat-11", MTI1: "MTG-I1" };
   const STAT_LABEL = {
     sum_pos: "Summed positive residual", max: "Maximum residual", max_z: "Maximum z-score",
     n_above: "Pixels above z = 4", vrp_w: "Radiative power (W)", mean: "Mean residual",
@@ -83,12 +84,26 @@
       return (await r.text()).split("\n").filter(Boolean).map((l) => JSON.parse(l));
     }));
     state.rows = parts.flat().sort((a, b) => a.time.localeCompare(b.time));
-    setStatus(`${state.rows.length} images`);
+    const byPlatform = {};
+    for (const r of state.rows) byPlatform[r.platform || "?"] = (byPlatform[r.platform || "?"] || 0) + 1;
+    const platformParts = Object.entries(byPlatform).sort().map(([p, n]) => `${n} ${PLATFORM_NAME[p] || p}`);
+    setStatus(`${state.rows.length} images (${platformParts.join(", ")})`);
+  }
+  // A range is "all", a number of days back from now, or a fixed window "YYYY-MM..YYYY-MM".
+  function rangeWindow() {
+    if (state.range === "all") return null;
+    if (state.range.includes("..")) {
+      const [a, b] = state.range.split("..");
+      return { fromMonth: a, toMonth: b, from: Date.parse(a + "-01T00:00:00Z") / 1000,
+               to: Date.parse(b + "-01T00:00:00Z") / 1000 + 32 * 86400 };
+    }
+    const from = Date.now() / 1000 - Number(state.range) * 86400;
+    return { fromMonth: new Date(from * 1000).toISOString().slice(0, 7), toMonth: "9999-99", from, to: Infinity };
   }
   function monthsInRange(months) {
-    if (state.range === "all") return months;
-    const since = new Date(Date.now() - Number(state.range) * 86400e3).toISOString().slice(0, 7);
-    return months.filter((m) => m >= since);
+    const w = rangeWindow();
+    if (!w) return months;
+    return months.filter((m) => m >= w.fromMonth && m <= w.toMonth);
   }
   async function loadEruptions() {
     try {
@@ -103,9 +118,9 @@
 
   // ---------- charts ----------
   function rowsInRange() {
-    if (state.range === "all") return state.rows;
-    const since = Date.now() / 1000 - Number(state.range) * 86400;
-    return state.rows.filter((r) => Date.parse(r.time) / 1000 >= since);
+    const w = rangeWindow();
+    if (!w) return state.rows;
+    return state.rows.filter((r) => { const t = Date.parse(r.time) / 1000; return t >= w.from && t < w.to; });
   }
   function bandsPlugin(getBands, color) {
     return { hooks: { drawClear: [(u) => {
@@ -171,7 +186,7 @@
     });
     chart = new uPlot({
       ...common($("chart")),
-      series: [{}, { label: STAT_LABEL[state.stat], stroke: series, width: 2, spanGaps: false, points: { show: real.length < 400, size: 6, stroke: series, fill: css("--surface"), width: 2 } },
+      series: [{}, { label: STAT_LABEL[state.stat], stroke: series, width: 2, spanGaps: false, points: { show: true, size: real.length < 400 ? 6 : 4, stroke: series, fill: css("--surface"), width: real.length < 400 ? 2 : 1.5 } },
                    { label: "saturated", stroke: css("--sat"), width: 0, points: { show: true, size: 12, stroke: css("--sat"), fill: css("--sat"), width: 1 }, paths: () => null }],
       hooks: {
         setCursor: [(u) => showTip(u, rows)],
@@ -202,6 +217,7 @@
     add(r.n_valid ? Math.round(100 * (r.n_cloud || 0) / r.n_valid) + "%" : "–", "cloud");
     if (r.n_sat) add(String(r.n_sat), "saturated px");
     add(r.sza_mean != null ? r.sza_mean.toFixed(0) + "°" : "–", "solar zenith");
+    if (r.platform) add(PLATFORM_NAME[r.platform] || r.platform, "satellite");
     tip.hidden = false;
     const left = u.cursor.left, rect = u.over.getBoundingClientRect(), card = $("chart").closest(".card").getBoundingClientRect();
     const x = rect.left - card.left + left + 14, maxX = card.width - tip.offsetWidth - 8;
