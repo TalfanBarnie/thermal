@@ -51,11 +51,13 @@ class BackfillState:
             self.data["failed"].pop(ts, None)
 
     def mark_failed(self, ts: str, error: str) -> None:
+        error = redact(error)
         with self._lock:
             entry = self.data["failed"].setdefault(ts, {"attempts": 0})
             entry["attempts"] += 1
-            entry["error"] = redact(error)[:500]
+            entry["error"] = error[:500]
             entry["at"] = datetime.now(UTC).isoformat()
+        log.warning("%s failed (attempt %d): %s", ts, entry["attempts"], error[:300])
 
     def save(self) -> None:
         with self._lock:
@@ -63,6 +65,15 @@ class BackfillState:
 
     def summary(self) -> dict[str, int]:
         return {"done": len(self.data["done"]), "failed": len(self.data["failed"])}
+
+    def error_kinds(self, limit: int = 8) -> dict[str, int]:
+        """Count of still-failed timestamps by error message (truncated), most common first."""
+        counts: dict[str, int] = {}
+        for entry in self.data["failed"].values():
+            kind = str(entry.get("error", ""))[:120]
+            counts[kind] = counts.get(kind, 0) + 1
+        ranked = sorted(counts.items(), key=lambda kv: -kv[1])
+        return dict(ranked[:limit])
 
 
 def run_backfill(
@@ -250,6 +261,8 @@ def run_backfill(
         ),
         **state.summary(),
     }
+    if state.data["failed"]:
+        summary["error_kinds"] = state.error_kinds()
     log.info("backfill summary: %s", summary)
     return summary
 

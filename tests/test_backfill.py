@@ -44,6 +44,7 @@ def test_backfill_resumes_and_records_failures(monkeypatch):
 
     s1 = backfill.run_backfill(None, storage, sat, ts, "job", max_minutes=10, concurrency=2)
     assert s1["done"] == 3 and s1["failed"] == 1 and s1["processed_this_run"] == 4
+    assert s1["error_kinds"] == {"{'l15': 'boom'}": 1}
     state = storage.private.get_json("state/backfill/job.json")
     assert state["failed"]["20240101T020000"]["attempts"] == 1
     assert state["done"]["20240101T000000"]["platform"] == "MSG3"

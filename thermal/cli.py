@@ -109,7 +109,9 @@ def cmd_predict(args) -> int:
     if not report["ok"]:
         print(json.dumps(report, indent=1, default=str))
         return 1
-    l15 = out_dir / "l15" / raw_key_name(sat["key"], t, "l15")
+    # The cutout may have been reused from the bucket or freshly tailored; the fetch
+    # report says where it landed locally.
+    l15 = Path(report["products"]["l15"]["local_path"])
     fs = features.build_features(l15, t, sat)
     platform = args.platform or fs.platform
     if args.model:
@@ -123,7 +125,8 @@ def cmd_predict(args) -> int:
     model = BackgroundModel.load(model_path)
     images = anomaly.predict_images(model, fs)
     cloud = None
-    clm = out_dir / "clm" / raw_key_name(sat["key"], t, "clm")
+    clm_entry = report["products"].get("clm", {})
+    clm = Path(clm_entry["local_path"]) if "local_path" in clm_entry else out_dir / "no-clm"
     if clm.exists():
         import xarray as xr
 

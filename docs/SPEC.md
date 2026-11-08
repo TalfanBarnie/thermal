@@ -542,6 +542,28 @@ slice ran in date order; later slices run in a fixed shuffled order).
   2024-03-16T22:00Z: maximum z-score 49, 21 pixels above z = 4, summed
   positive residual 2.24 (was 1.24 with the smoke model); the residual image
   is flat noise apart from the eruption.
+- **Full Meteosat-11 model (2026-11-08)**: 980 cutouts from the 999 fetched
+  for `msg-0deg_msg4_train.csv` (19 products in the 0° collection between
+  May 2018 and January 2022 carry a Meteosat-9 `MSG2` identifier and were
+  skipped; the platform-history table does not list them, so they are
+  presumably short backup periods and need checking), 3.92 M pixels, 590
+  training days, 147 held-out days. Held-out results in IR3.9 brightness
+  temperature:
+
+  | Model | All | Day (sza < 80) | Twilight | Night (sza > 100) | z-score std |
+  |---|---|---|---|---|---|
+  | MLP 3x128 | RMSE 2.28 K, MAD 1.02 K | 2.71 | 2.19 | 1.77 | 1.16 (92% within 2) |
+  | Ridge deg 2 | RMSE 4.16 K, MAD 1.73 K | 3.76 | 4.05 | 4.70 | 1.97 |
+
+  The MLP is promoted (`models/msg-0deg/MSG4/latest.json`, model id
+  `mlp_20261108T125514`, early-stopped after 15 epochs). It is slightly
+  worse than the Meteosat-10 model at night (1.77 K against 1.51 K) with a
+  similar daytime error; months March to July are worst (2.5 to 2.8 K),
+  November best (1.3 K). The workflow's detection check on
+  2021-03-20T22:00Z did not run: `thermal predict` looked for the fresh
+  cutout under the wrong local name (the same path bug fixed earlier in the
+  live loop), now corrected; the timestamp is in the eruption list and is
+  checked through the eruption-window processing instead.
 - Still open: compare the night-time noise floor with the instrument NEdT
   and add the spatial mean-residual map and histogram to the report; the
   ridge design matrix is fitted on 300 k rows for memory.
@@ -649,8 +671,17 @@ slice ran in date order; later slices run in a fixed shuffled order).
 - The hourly `live` schedule has in fact been running since 2026-11-06
   because this branch is the repository's default branch; its early rows
   used the smoke model and are being reprocessed with the full model.
-- Pending: train the Meteosat-11 era, fetch and process the remaining
-  3,800 eruption-window timestamps, then the full validation.
+- **Processing pass 1 (2026-11-08 12:49 UTC)**: the first `eruptions-process`
+  run (`--only-stored`) found 413 stored cutouts, processed 211 and failed
+  202. The failures left no trace in the log because the runner only wrote
+  the error into the state file; it now logs every failure and the summary
+  carries a count by error message. The failed timestamps are all in the
+  Meteosat-11 era, whose model was still training when the run started
+  (hypothesis, to be confirmed by the retry). The fetch job stood at 440
+  done, 4 failed, 3,536 remaining at 13:47 UTC after its first slice
+  since the restart (188 timestamps in 5 hours at concurrency 2).
+- Pending: process the remaining eruption-window timestamps as they arrive,
+  then the full validation.
 
 ## 19. Remaining items to verify
 
