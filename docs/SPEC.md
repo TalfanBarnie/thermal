@@ -528,10 +528,23 @@ slice ran in date order; later slices run in a fixed shuffled order).
   residual image is flat apart from the eruption, maximum z-score 13.9,
   8 pixels above z=4 in the Reykjanes region. Cloud structure that
   dominated the raw IR3.9 image is removed by the model.
-- Remaining for M3: retrain once the backfills complete (~1000 images per
-  era), compare the candidates per solar-zenith bin, check the residual
-  noise floor at night against the instrument NEdT, and add the spatial
-  mean-residual map and histogram figures to the report.
+- **Full Meteosat-10 model (2026-11-08)**: 985 cutouts (15 of the 1000 were
+  Meteosat-11 cover periods and were skipped), 3.94 M pixels, 465 training
+  days, 116 held-out days. Held-out results in IR3.9 brightness temperature:
+
+  | Model | All | Day (sza < 80) | Twilight | Night (sza > 100) | z-score std |
+  |---|---|---|---|---|---|
+  | MLP 3x128 | RMSE 2.06 K, MAD 0.93 K | 2.78 / 1.52 | 1.82 / 0.85 | 1.51 / 0.73 | 1.12 (93% within 2) |
+  | Ridge deg 2 | RMSE 3.42 K, MAD 1.57 K | 3.83 / 2.15 | 3.33 / 1.51 | 3.13 / 1.26 | 1.98 |
+
+  The MLP is promoted (`models/msg-0deg/MSG3/latest.json`). Residuals are
+  worst in June (3.2 K) and best in December (1.0 K). Detection check on
+  2024-03-16T22:00Z: maximum z-score 49, 21 pixels above z = 4, summed
+  positive residual 2.24 (was 1.24 with the smoke model); the residual image
+  is flat noise apart from the eruption.
+- Still open: compare the night-time noise floor with the instrument NEdT
+  and add the spatial mean-residual map and histogram to the report; the
+  ridge design matrix is fitted on 300 k rows for memory.
 
 ## 16. Milestone M4 status (2026-11-06)
 
