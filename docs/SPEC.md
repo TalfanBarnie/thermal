@@ -612,7 +612,12 @@ slice ran in date order; later slices run in a fixed shuffled order).
   2021-03-20T22:00Z did not run: `thermal predict` looked for the fresh
   cutout under the wrong local name (the same path bug fixed earlier in the
   live loop), now corrected; the timestamp is in the eruption list and is
-  checked through the eruption-window processing instead.
+  checked through the eruption-window processing instead. Result: the
+  Fagradalsfjall onset (fissure opened about 20:45 UTC on 2021-03-20) was
+  under full cloud in every sample of the first 24 hours; the 22:00 sample
+  gives maximum z 2.0 and the 21 March 20:00 sample 3.8, so the first night
+  of that small, cloud-covered eruption is not detected at z >= 4. The 15
+  minute cadence and the full window will show when it first appears.
 - Still open: compare the night-time noise floor with the instrument NEdT
   and add the spatial mean-residual map and histogram to the report; the
   ridge design matrix is fitted on 300 k rows for memory.
@@ -729,6 +734,10 @@ slice ran in date order; later slices run in a fixed shuffled order).
   (hypothesis, to be confirmed by the retry). The fetch job stood at 440
   done, 4 failed, 3,536 remaining at 13:47 UTC after its first slice
   since the restart (188 timestamps in 5 hours at concurrency 2).
+- **Processing pass 2 (2026-11-08 18:55 UTC)**: with the Meteosat-11 model in
+  place the 202 failed timestamps and the newly stored ones processed
+  cleanly (416 processed, 0 failed, 627 done). The fetch job reached 821
+  done, 4 failed, 3,155 remaining at 23:55 UTC (204 per 5 hour slice).
 - Pending: process the remaining eruption-window timestamps as they arrive,
   then the full validation.
 
