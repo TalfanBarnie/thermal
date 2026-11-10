@@ -738,6 +738,18 @@ slice ran in date order; later slices run in a fixed shuffled order).
   place the 202 failed timestamps and the newly stored ones processed
   cleanly (416 processed, 0 failed, 627 done). The fetch job reached 821
   done, 4 failed, 3,155 remaining at 23:55 UTC (204 per 5 hour slice).
+- **Progress to 2026-11-10 01:17 UTC**: fetch at 1,682 done, 2 failed, 2,294
+  remaining; 1,491 timestamps modelled and published (every processing pass
+  since the Meteosat-11 model clean). Slice throughput varied from 112 to
+  233 timestamps per 5 hours with Data Tailor load (European daytime is
+  slowest).
+- **Stalled on Actions minutes**: from 01:08 UTC on 2026-11-10 every
+  dispatched job failed within two seconds with no runner assigned and no
+  log, the signature of an exhausted Actions quota on a private repository.
+  The fetch chain broke at that point (a failed slice does not re-dispatch).
+  Both jobs are resumable from their state files: re-dispatch `backfill.yml`
+  with job `eruptions` (fetch, chain true) and `eruptions-process` (process,
+  only_stored) once minutes are available again.
 - Pending: process the remaining eruption-window timestamps as they arrive,
   then the full validation.
 
