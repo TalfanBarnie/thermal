@@ -33,3 +33,25 @@ thermal inspect ./scratch/l15/*.nc              # metadata summary of a cutout
 ```
 
 Raw EUMETSAT cutouts must never be committed; `*.nc` is ignored by git.
+
+## Licence and data
+
+The code in this repository is released under the [MIT licence](LICENSE),
+copyright 2026 Talfan Barnie. The licence covers the code and configuration
+only; the material below has its own terms.
+
+- **Satellite data.** The pipeline reads Meteosat SEVIRI level 1.5 imagery and
+  cloud masks from the EUMETSAT Data Store under EUMETSAT's data licence. The
+  raw cutouts are kept in a private bucket and are never committed or
+  published. The images and time series on the public site are derived
+  products (model residuals, statistics and fixed-scale colour renderings)
+  and are not a redistribution of the original data; they are published with
+  the attribution "contains modified EUMETSAT data". Running the pipeline
+  yourself requires your own EUMETSAT Data Store account.
+- **Eruption calendar.** `data/eruptions.csv` was compiled from the
+  Smithsonian Institution Global Volcanism Program (Volcanoes of the World
+  database) and from Wikipedia eruption articles (text licensed CC BY-SA 4.0),
+  with manual corrections. Please cite those sources if you reuse it.
+- **uPlot.** The web app vendors [uPlot](https://github.com/leeoniya/uPlot),
+  MIT licensed; its licence file is in `web/vendor/`.
+

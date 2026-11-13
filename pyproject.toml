@@ -7,6 +7,9 @@ name = "thermal"
 version = "0.0.1"
 description = "Volcanic thermal anomaly detection over Iceland from Meteosat imagery"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Talfan Barnie" }]
 requires-python = ">=3.11"
 dependencies = [
     "eumdac>=3.0",
