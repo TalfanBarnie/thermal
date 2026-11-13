@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 import pytest
 
 from thermal import config
@@ -39,7 +41,9 @@ def test_settings_from_env(monkeypatch):
     s = config.load_settings()
     assert s.b2_private.name == "priv"
     assert s.b2_public.key_id == "uk"
-    assert s.b2_public_url.endswith("backblazeb2.com")
+    host = urlparse(s.b2_public_url).hostname
+    assert host is not None
+    assert host == "backblazeb2.com" or host.endswith(".backblazeb2.com")
 
 
 def test_settings_missing(monkeypatch):
