@@ -18,6 +18,8 @@ on:
 concurrency:
   group: live
   cancel-in-progress: false
+permissions:
+  contents: read
 jobs:
   live:
     runs-on: ubuntu-latest

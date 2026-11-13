@@ -12,6 +12,8 @@ on:
         default: "2026-11-15"
       step_days:
         default: "30"
+permissions:
+  contents: read
 jobs:
   platforms:
     runs-on: ubuntu-latest

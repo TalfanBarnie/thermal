@@ -23,6 +23,8 @@ on:
       check_time:
         description: eruption timestamp for the detection check (empty to skip)
         default: "2024-03-16T22:00:00Z"
+permissions:
+  contents: read
 jobs:
   train:
     runs-on: ubuntu-latest

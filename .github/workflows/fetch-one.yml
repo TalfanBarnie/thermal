@@ -19,6 +19,8 @@ on:
         description: also print the quicklook PNGs base64-encoded into the log (debugging)
         type: boolean
         default: false
+permissions:
+  contents: read
 jobs:
   fetch:
     runs-on: ubuntu-latest

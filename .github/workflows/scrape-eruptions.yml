@@ -3,6 +3,8 @@ name: scrape eruption tables
 # job log, to be curated by hand into data/eruptions.csv.
 on:
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   scrape:
     runs-on: ubuntu-latest

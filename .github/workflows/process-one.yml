@@ -12,6 +12,8 @@ on:
         description: re-process even if products exist
         type: boolean
         default: false
+permissions:
+  contents: read
 jobs:
   process:
     runs-on: ubuntu-latest
