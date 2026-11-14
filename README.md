@@ -4,6 +4,9 @@ Lightweight detection of volcanic thermal anomalies over Iceland from
 Meteosat (SEVIRI and FCI) imagery, designed to run in a GitHub Action with a
 Backblaze B2 bucket for storage and a static web app for display.
 
+**Live site:** <https://talfanbarnie.github.io/thermal/> shows the Reykjanes
+time series with per-image residual and observed quicklooks.
+
 The design is described in [docs/SPEC.md](docs/SPEC.md).
 
 ## Layout
