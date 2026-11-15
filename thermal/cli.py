@@ -390,7 +390,9 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--out", help="local output directory (default: temp dir)")
     f.add_argument("--no-upload", action="store_true", help="do not write to the buckets")
     f.add_argument("--no-cloudmask", action="store_true")
-    f.add_argument("--force", action="store_true", help="fetch again even if the cutout is already stored")
+    f.add_argument(
+        "--force", action="store_true", help="fetch again even if the cutout is already stored"
+    )
     f.add_argument("--quicklook", action="store_true", help="render PNG quicklooks")
     f.set_defaults(func=cmd_fetch)
 

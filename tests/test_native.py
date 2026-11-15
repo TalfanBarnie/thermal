@@ -76,3 +76,14 @@ def test_native_entry_picks_nat_file():
         entries = ("EOPMetadata.xml", "MSG4-SEVI-MSG15-0100-NA-x.nat", "manifest.xml")
 
     assert native.native_entry(P()).endswith(".nat")
+
+
+def test_extract_native_from_zip(tmp_path):
+    import zipfile
+
+    zp = tmp_path / "p.zip"
+    with zipfile.ZipFile(zp, "w") as zf:
+        zf.writestr("EOPMetadata.xml", "<x/>")
+        zf.writestr("MSG4-SEVI-MSG15-0100-NA-x.nat", b"\x01" * 1000)
+    out = native.extract_native(zp, tmp_path)
+    assert out.name.endswith(".nat") and out.read_bytes() == b"\x01" * 1000

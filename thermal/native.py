@@ -46,18 +46,47 @@ def native_entry(product: Any) -> str:
     return names[0]
 
 
+def extract_native(zip_path: Path, out_dir: Path) -> Path:
+    """Extract the `.nat` member of a Data Store product zip into out_dir."""
+    import zipfile
+
+    with zipfile.ZipFile(zip_path) as zf:
+        names = [n for n in zf.namelist() if n.lower().endswith(".nat")]
+        if not names:
+            raise RuntimeError(f"no .nat member in {zip_path.name}: {zf.namelist()}")
+        target = out_dir / Path(names[0]).name
+        with zf.open(names[0]) as src, open(target, "wb") as dst:
+            for chunk in iter(lambda: src.read(4 * 1024 * 1024), b""):
+                dst.write(chunk)
+    return target
+
+
 def download_native(product: Any, out_dir: Path) -> Path:
-    """Stream the product's `.nat` file into out_dir and return its path."""
-    entry = native_entry(product)
+    """Download the product zip, extract its `.nat` file into out_dir and return its path.
+
+    The zip is about a third of the size of the uncompressed `.nat` that the per-entry
+    endpoint serves (36 MB against 102 MB for an RSS image), so this is the lighter route.
+    The zip is deleted once the `.nat` is extracted.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
-    target = out_dir / Path(entry).name
+    zip_path = out_dir / f"{product}.zip"
     t0 = time.monotonic()
-    with product.open(entry=entry) as stream, open(target, "wb") as fh:
+    with product.open() as stream, open(zip_path, "wb") as fh:
         for chunk in iter(lambda: stream.read(4 * 1024 * 1024), b""):
             fh.write(chunk)
-    size = target.stat().st_size
-    dt = time.monotonic() - t0
-    log.info("downloaded %s (%.1f MB in %.1f s)", target.name, size / 1e6, dt)
+    zip_mb = zip_path.stat().st_size / 1e6
+    t1 = time.monotonic()
+    try:
+        target = extract_native(zip_path, out_dir)
+    finally:
+        zip_path.unlink(missing_ok=True)
+    log.info(
+        "downloaded %s (%.1f MB zip in %.1f s, extracted in %.1f s)",
+        target.name,
+        zip_mb,
+        t1 - t0,
+        time.monotonic() - t1,
+    )
     return target
 
 
