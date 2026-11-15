@@ -87,3 +87,17 @@ def test_extract_native_from_zip(tmp_path):
         zf.writestr("MSG4-SEVI-MSG15-0100-NA-x.nat", b"\x01" * 1000)
     out = native.extract_native(zp, tmp_path)
     assert out.name.endswith(".nat") and out.read_bytes() == b"\x01" * 1000
+
+
+def test_mask_outside_box_matches_tailor(tmp_path):
+    path, _, _ = _write(tmp_path)
+    with xr.open_dataset(path, decode_times=False) as ds:
+        ds.load()
+    lat, lon, _ = geo.geolocate(ds)
+    box = [64.0, 63.9, -22.4, -22.0]
+    masked = native.mask_outside_box(ds, box)
+    inside = (lat >= 63.9) & (lat <= 64.0) & (lon >= -22.4) & (lon <= -22.0)
+    assert inside.any() and (~inside).any()
+    for i in range(1, 12):
+        v = masked[f"channel_{i}"].values
+        assert np.isfinite(v[inside]).all() and np.isnan(v[~inside]).all()

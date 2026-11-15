@@ -171,6 +171,23 @@ def _header_calibration(scn: Any) -> dict[str, tuple[float, float]]:
     return {ch: (float(offsets[i]), float(slopes[i])) for i, ch in enumerate(SEVIRI_CHANNELS)}
 
 
+def mask_outside_box(ds: xr.Dataset, roi_nswe: list[float]) -> xr.Dataset:
+    """Set channel pixels outside the N, S, W, E box to NaN, as the Data Tailor does.
+
+    A lat/lon box is not a rectangle on the geostationary grid, so the bounding rectangle
+    that satpy crops contains extra pixels; masking them keeps the domain identical to
+    Data Tailor cutouts (and to the 0 degree training domain).
+    """
+    from . import geo
+
+    north, south, west, east = roi_nswe
+    lat, lon, _ = geo.geolocate(ds)
+    inside = (lat >= south) & (lat <= north) & (lon >= west) & (lon <= east)
+    for name in [v for v in ds.data_vars if v.startswith("channel_")]:
+        ds[name] = ds[name].where(inside)
+    return ds
+
+
 def crop_native(nat_path: Path, roi_nswe: list[float], out_nc: Path, product_name: str) -> Path:
     """Crop a native SEVIRI file to the N, S, W, E box and write a cutout netCDF."""
     from satpy import Scene
@@ -210,6 +227,7 @@ def crop_native(nat_path: Path, roi_nswe: list[float], out_nc: Path, product_nam
             "end_time": str(first.attrs.get("end_time", "")),
         },
     )
+    ds = mask_outside_box(ds, roi_nswe)
     out_nc.parent.mkdir(parents=True, exist_ok=True)
     ds.to_netcdf(out_nc)
     log.info("cropped %s to %s (%d x %d)", nat_path.name, out_nc.name, y.size, x.size)
