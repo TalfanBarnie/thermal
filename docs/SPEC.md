@@ -780,6 +780,20 @@ function of latitude and longitude, and would be extrapolating on RSS.
   account and each timestamp needs two (image and cloud mask), which caps
   fetching at roughly 1,500 timestamps a day; the full RSS set needs about
   five weeks. Raw storage is about 0.5 MB per timestamp (26 GB in all).
+- **Blocker found 2026-11-15**: the Data Tailor `HRSEVIRI` chain
+  mis-georeferences RSS level 1.5 images. Test fetch at 2024-03-16T22:00Z
+  (Meteosat-11 on RSS, product `MSG4-SEVI-MSG15-0100-NA-20240316215918...`,
+  `origin 2321 1`): the output grid has a pixel spacing of about 5,520 m,
+  against about 2,990 m in the cloud mask cut from the same timestamp, and
+  every valid pixel in every channel equals that channel's calibration offset
+  (zero counts). The tailor crops our box in its own wrong geometry, which
+  lands on the unscanned part of the array. The RSS cloud mask (`MSGCLMK` on
+  `EO:EUM:DAT:MSG:RSS-CLM`, 50 x 203 pixels) is correct. RSS image fetching
+  through the Data Tailor is therefore unusable; the alternative is to
+  download the native files (about 36 MB each) and crop them ourselves. The
+  bad test cutout is `raw/msg-rss/2024/03/16/20240316T220000_l15.nc` in the
+  private bucket and must be overwritten or deleted before any RSS backfill,
+  since the backfill reuses stored cutouts.
 
 ## 20. Remaining items to verify
 
