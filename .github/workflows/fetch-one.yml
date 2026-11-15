@@ -15,6 +15,10 @@ on:
         description: store the cutouts in the private bucket
         type: boolean
         default: true
+      force:
+        description: fetch again even if the cutout is already stored (overwrites it)
+        type: boolean
+        default: false
       print_quicklooks:
         description: also print the quicklook PNGs base64-encoded into the log (debugging)
         type: boolean
@@ -42,9 +46,12 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -e .
+      - name: satpy for native cropping (RSS)
+        if: ${{ inputs.sat == 'msg-rss' }}
+        run: pip install -e ".[native]"
       - run: >
           thermal fetch --sat "${{ inputs.sat }}" --time "${{ inputs.time }}"
-          --out "$RUNNER_TEMP/fetch" --quicklook ${{ inputs.upload == false && '--no-upload' || '' }}
+          --out "$RUNNER_TEMP/fetch" --quicklook ${{ inputs.upload == false && '--no-upload' || '' }} ${{ inputs.force && '--force' || '' }}
       - name: print quicklooks (base64) for inspection without artifact access
         if: ${{ inputs.print_quicklooks }}
         run: |

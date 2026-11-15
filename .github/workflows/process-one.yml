@@ -35,6 +35,9 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -e .
+      - name: satpy for native cropping (RSS)
+        if: ${{ inputs.sat == 'msg-rss' }}
+        run: pip install -e ".[native]"
       - run: >
           thermal process --sat "${{ inputs.sat }}" --time "${{ inputs.time }}"
           ${{ inputs.force && '--force' || '' }}

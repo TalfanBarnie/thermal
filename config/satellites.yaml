@@ -27,8 +27,11 @@ msg-rss:
   instrument: SEVIRI
   collection: EO:EUM:DAT:MSG:MSG15-RSS
   cloudmask_collection: EO:EUM:DAT:MSG:RSS-CLM
-  tailor_product: HRSEVIRI            # verify
-  tailor_cloudmask_product: MSGCLMK   # verify
+  tailor_product: HRSEVIRI            # not used for l15: see l15_method
+  tailor_cloudmask_product: MSGCLMK   # verified 2026-11-15: correct grid
+  # The Data Tailor mis-georeferences RSS level 1.5 images (SPEC section 19), so the
+  # native .nat file is downloaded and cropped locally with satpy (thermal/native.py).
+  l15_method: native
   platform_filter: null
   sub_lon: 9.5
   cadence_minutes: 5

@@ -72,6 +72,20 @@ def fetch_timestamp(
                 storage.private.get_file(key, nc_path)
                 entry["reused_key"] = key
                 log.info("%s %s: reusing %s", sat["key"], t.isoformat(), key)
+            elif kind == "l15" and sat.get("l15_method") == "native":
+                entry["method"] = "native"
+                nc_path = _native_with_retries(
+                    client,
+                    sat,
+                    t,
+                    coll_id,
+                    roi,
+                    out_dir / kind,
+                    entry,
+                    retries,
+                    retry_wait_s,
+                    deadline=deadline,
+                )
             else:
                 nc_path = _tailor_with_retries(
                     client,
@@ -116,6 +130,62 @@ def fetch_timestamp(
 
 def _past(deadline: float | None) -> bool:
     return deadline is not None and time.monotonic() > deadline
+
+
+def _native_with_retries(
+    client,
+    sat,
+    t,
+    coll_id,
+    roi,
+    out_dir,
+    entry,
+    retries,
+    retry_wait_s,
+    deadline=None,
+) -> Path:
+    """Download the native .nat file and crop it locally (see thermal/native.py)."""
+    from . import native
+
+    product = client.product_at(
+        coll_id, t, sat["cadence_minutes"], platform=sat.get("platform_filter")
+    )
+    if product is None:
+        raise RuntimeError(f"no product found in {coll_id} near {t.isoformat()}")
+    entry["product"] = client.product_summary(product)
+    last_exc: Exception | None = None
+    for attempt in range(retries + 1):
+        nat: Path | None = None
+        try:
+            if _past(deadline):
+                raise TimeoutError("batch deadline reached before the download started")
+            t0 = time.monotonic()
+            nat = native.download_native(product, out_dir / "native")
+            t1 = time.monotonic()
+            nc = native.crop_native(nat, roi, out_dir / f"{product}_cutout.nc", f"{product}.nat")
+            entry["native"] = {
+                "attempt": attempt + 1,
+                "nat_bytes": nat.stat().st_size,
+                "download_s": round(t1 - t0, 1),
+                "crop_s": round(time.monotonic() - t1, 1),
+            }
+            return nc
+        except Exception as exc:
+            last_exc = exc
+            if "403" in str(exc):
+                raise RuntimeError(
+                    f"Data Store refused the download of {product} (403): the account is not "
+                    "entitled to this product, most likely a near-real-time embargo"
+                ) from exc
+            log.warning("native attempt %d failed for %s: %s", attempt + 1, product, exc)
+            if _past(deadline):
+                break
+            if attempt < retries:
+                time.sleep(retry_wait_s * (attempt + 1))
+        finally:
+            if nat is not None:
+                nat.unlink(missing_ok=True)  # the full file is never kept
+    raise RuntimeError(f"native download failed after {retries + 1} attempts: {last_exc}")
 
 
 def _tailor_with_retries(

@@ -61,6 +61,17 @@ def summarise(path: Path) -> dict[str, Any]:
                 "median_pixel_area_km2": float(np.nanmedian(geo.pixel_area_m2(lat, lon)) / 1e6),
             }
             out["footprint"] = footprint_check(ds, lat, lon)
+            if "channel_4" in ds.variables:
+                ir39 = np.asarray(ds["channel_4"].values, dtype=float)
+                if np.isfinite(ir39).any():
+                    r, c = np.unravel_index(int(np.nanargmax(ir39)), ir39.shape)
+                    out["hottest_channel_4"] = {
+                        "radiance": float(ir39[r, c]),
+                        "row": int(r),
+                        "col": int(c),
+                        "lat": float(lat[r, c]),
+                        "lon": float(lon[r, c]),
+                    }
         except Exception as exc:
             out["geolocation"] = {"error": str(exc)}
     return out
