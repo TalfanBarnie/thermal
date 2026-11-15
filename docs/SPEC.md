@@ -765,12 +765,28 @@ scattering and glint geometry by day) changes. In 0° training data each pixel
 has a fixed view zenith angle, so the network has effectively learnt it as a
 function of latitude and longitude, and would be extrapolating on RSS.
 
-- **Platform history**: `platforms.yml` run on the RSS collection at weekly
-  steps from 2008-05 gives the RSS handover table; it is recorded in
-  `data/platform_history.csv` with source `msg-rss`.
+- **Platform history** (`platforms.yml` on the RSS collection, weekly steps,
+  recorded in `data/platform_history.csv` with source `msg-rss`, dates to a
+  week): Meteosat-8 (`MSG1`) 2008-05 to 2013-03, Meteosat-9 (`MSG2`) 2013-03
+  to 2018-03, Meteosat-10 (`MSG3`) 2018-03 to 2023-03, Meteosat-11 (`MSG4`)
+  since 2023-03-30, with short backup swaps. Most years have a three to four
+  week winter gap with no RSS products; the 2024 gap (1 to 29 February)
+  covers Sundhnúkur 3 (8 to 9 February 2024), so that eruption has no RSS
+  imagery. Every Sundhnúkur eruption was imaged on RSS by Meteosat-11, so the
+  eruption windows need only the `MSG4` RSS model; `MSG3` covers Fagradalsfjall
+  2021 and 2022, and `MSG1`/`MSG2` the older eruptions.
 - **Training**: one model per RSS platform, 1,000 stratified non-eruption
-  images each (`data/samples/msg-rss_<platform>_train.csv`), trained with
-  `train.yml` exactly as for 0°.
+  images each (`data/samples/msg-rss_<platform>_train.csv`, drawn only from
+  weeks when that platform was alone on the RSS slot, balanced over month and
+  hour), trained with `train.yml` exactly as for 0°.
+- **Native route verified 2026-11-15**: `l15_method: native` (download the
+  product zip, about 37 MB, extract the `.nat`, crop with satpy, mask outside
+  the box) gives a 50 x 201 cutout on the same grid as the RSS cloud mask.
+  On 2024-11-21T01:00Z (Sundhnúkur 7, mostly clear) the hottest IR3.9 pixel is
+  saturated at exactly the channel's saturation radiance at 63.93°N 22.56°W,
+  within about a pixel of the fissure and lava field. Timing per timestamp:
+  5.4 s download, 0.4 s extraction, 2.9 s crop; the cloud mask through the
+  Data Tailor (25 to 45 s, three at a time) is now the bottleneck.
 - **Eruption windows**: Sundhnúkur 1 to 9 at full 5-minute resolution with
   a 2-day margin, 52,704 timestamps, split into
   `msg-rss_eruptions_onsets.csv` (one day before to two days after each start
