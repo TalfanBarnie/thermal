@@ -854,6 +854,56 @@ function of latitude and longitude, and would be extrapolating on RSS.
   private bucket and must be overwritten or deleted before any RSS backfill,
   since the backfill reuses stored cutouts.
 
+### RSS plan and resume checklist (written 2026-11-15, nothing RSS fetched yet)
+
+State when paused: the native route works and is merged; the per-satellite
+training lists and the Sundhnúkur eruption lists are committed; no RSS
+backfill has been started. The only RSS data in the private bucket are the
+test cutouts for 2024-03-16T22:00Z and 2024-11-21T01:00Z (both from the
+native route, correct).
+
+Decision still open: fetch the RSS cloud masks through the Data Tailor (as
+now; it works but caps throughput at about 5,800 timestamps a day, so the full
+job is about 10 days) or switch them to direct download too (product about
+130 KB, read with satpy's `seviri_l2_grib` reader, crop and mask as for the
+images; removes the Data Tailor entirely, estimated 3 to 6 days, limited by
+EUMETSAT download rates). The recommendation is to switch, test it with
+`fetch-one.yml` on the same two nights, and check that the cloud mask still
+lands on the image grid.
+
+Steps, in order:
+
+1. (If switching) implement the direct cloud mask route behind a
+   `clm_method: native` key in `config/satellites.yaml`, mirroring
+   `l15_method`, with a unit test like `tests/test_native.py`.
+2. Fetch the Meteosat-11 RSS training set: `backfill.yml` with sat
+   `msg-rss`, job_id `rss-msg4-train`, list
+   `data/samples/msg-rss_msg4_train.csv`, mode fetch, chain true. The
+   workflow installs satpy itself when sat is `msg-rss`.
+3. Fetch the eruption onsets: job_id `rss-eruptions-onsets`, list
+   `data/samples/msg-rss_eruptions_onsets.csv` (7,776 timestamps). Expect
+   "no product found" failures for Sundhnúkur 3: there are no RSS images
+   from 2024-02-01 to 2024-02-29.
+4. Train the Meteosat-11 RSS model: `train.yml` with sat `msg-rss`,
+   platform `MSG4`, list `data/samples/msg-rss_msg4_train.csv`, check_time
+   `2024-11-21T01:00:00Z` (clear night, saturated hotspot). The model lands
+   at `models/msg-rss/MSG4/latest.json`, separate from the 0° models.
+5. Process the onsets (`mode process`, `only_stored true`, job_id
+   `rss-eruptions-onsets-process`) and compare the RSS time series with the
+   0° one at matching times: onset times, peak z, saturation counts.
+6. Fetch and process the rest of the windows (`msg-rss_eruptions_rest.csv`,
+   44,928 timestamps), then the other three satellites' training sets
+   (`msg-rss_msg1/2/3_train.csv`) when the older eruptions are wanted.
+7. Website: `msg-rss` appears in the source selector automatically once its
+   shards exist (the app lists every source in `index.json`). At 5 minute
+   cadence a window has 12 times more rows than 0°; check the chart and the
+   monthly shard sizes stay manageable.
+
+Known gotchas: process-mode runs for any source share the `live`
+concurrency group, so RSS and 0° processing never run at once; a fetch with
+an existing cutout reuses it unless `force` is set; the 1-hour near-real-time
+embargo applies to RSS images too.
+
 ## 20. Remaining items to verify
 
 - Exact handover times in `data/platform_history.csv` (the backfill records
