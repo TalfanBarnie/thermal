@@ -753,7 +753,35 @@ slice ran in date order; later slices run in a fixed shuffled order).
 - Pending: process the remaining eruption-window timestamps as they arrive,
   then the full validation.
 
-## 19. Remaining items to verify
+## 19. Milestone M7: SEVIRI rapid scan service (started 2026-11-15)
+
+The rapid scan service (RSS, `msg-rss`) images the northern third of the disk
+every 5 minutes from 9.5°E. It is flown by the same MSG satellites that rotate
+through the 0° slot, but the 0° models are not reused, because the viewing
+geometry differs: Iceland is about 28.5° of longitude from the sub-satellite
+point instead of 19°, so the view zenith angle over Reykjanes is a few degrees
+higher, the atmospheric path is longer and the satellite azimuth (hence the
+scattering and glint geometry by day) changes. In 0° training data each pixel
+has a fixed view zenith angle, so the network has effectively learnt it as a
+function of latitude and longitude, and would be extrapolating on RSS.
+
+- **Platform history**: `platforms.yml` run on the RSS collection at weekly
+  steps from 2008-05 gives the RSS handover table; it is recorded in
+  `data/platform_history.csv` with source `msg-rss`.
+- **Training**: one model per RSS platform, 1,000 stratified non-eruption
+  images each (`data/samples/msg-rss_<platform>_train.csv`), trained with
+  `train.yml` exactly as for 0°.
+- **Eruption windows**: Sundhnúkur 1 to 9 at full 5-minute resolution with
+  a 2-day margin, 52,704 timestamps, split into
+  `msg-rss_eruptions_onsets.csv` (one day before to two days after each start
+  date, 7,776 timestamps, fetched first) and `msg-rss_eruptions_rest.csv`
+  (44,928). Fagradalsfjall 1 to 3 are left for later.
+- **Throughput**: the Data Tailor allows three customisations at a time per
+  account and each timestamp needs two (image and cloud mask), which caps
+  fetching at roughly 1,500 timestamps a day; the full RSS set needs about
+  five weeks. Raw storage is about 0.5 MB per timestamp (26 GB in all).
+
+## 20. Remaining items to verify
 
 - Exact handover times in `data/platform_history.csv` (the backfill records
   the platform of every fetched product, which will confirm them).
