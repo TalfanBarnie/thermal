@@ -750,8 +750,51 @@ slice ran in date order; later slices run in a fixed shuffled order).
   Both jobs are resumable from their state files: re-dispatch `backfill.yml`
   with job `eruptions` (fetch, chain true) and `eruptions-process` (process,
   only_stored) once minutes are available again.
-- Pending: process the remaining eruption-window timestamps as they arrive,
-  then the full validation.
+- **Fetch and processing complete (2026-11-15 13:38 UTC)**: all 3,976
+  eruption-window timestamps fetched and processed, none failed. One fetch
+  slice was lost to a GitHub runner failure on 2026-11-15 and restarted by
+  the check-in; the state files made the restart lossless.
+- **Full validation (2026-11-15)**: `thermal validate` on 4,050 public rows.
+  Onsets are the first sample at or above the threshold on or after the
+  calendar start date (hourly sampling for the first three days, 3-hourly
+  after). "Clear" and "cloudy" count samples during the eruption with under
+  and over half of the Reykjanes region flagged cloudy by the cloud mask.
+
+  | Eruption | Samples | First hit, z >= 4 | First hit, z >= 8 | Peak z | Detected clear, z >= 8 | Detected cloudy, z >= 8 |
+  |---|---|---|---|---|---|---|
+  | Geldingadalir 2021-03-19 | 1552 | 03-19 21:00 | 03-22 06:00 | 489 | 201/295 | 178/1225 |
+  | Meradalir 2022-08-03 | 232 | 08-03 15:00 | 08-03 15:00 | 158 | 36/57 | 18/143 |
+  | Litli-Hrútur 2023-07-10 | 296 | 07-10 18:00 | 07-10 19:00 | 141 | 67/96 | 21/168 |
+  | Sundhnúkur 1, 2023-12-18 | 112 | 12-18 23:00 | 12-18 23:00 | 519 | 0/4 | 14/76 |
+  | Sundhnúkur 2, 2024-01-14 | 104 | 01-14 09:00 | 01-14 09:00 | 180 | 6/25 | 7/47 |
+  | Sundhnúkur 3, 2024-02-08 | 96 | 02-08 07:00 | 02-08 07:00 | 1636 | 28/35 | 3/13 |
+  | Sundhnúkur 4, 2024-03-16 | 520 | 03-16 21:00 | 03-16 21:00 | 170 | 89/154 | 46/334 |
+  | Sundhnúkur 5, 2024-05-29 | 280 | 05-29 05:00 (false, sunrise) | 05-29 13:00 | 280 | 37/41 | 41/207 |
+  | Sundhnúkur 6, 2024-08-22 | 208 | 08-22 22:00 | 08-22 22:00 | 386 | 17/21 | 34/155 |
+  | Sundhnúkur 7, 2024-11-20 | 240 | 11-21 00:00 | 11-21 00:00 | 1015 | 88/118 | 21/90 |
+  | Sundhnúkur 8, 2025-04-01 | 88 | 04-01 07:00 (false, sunrise) | none | 5 | 0/7 | 0/17 |
+  | Sundhnúkur 9, 2025-07-16 | 248 | 07-16 06:00 | 07-16 06:00 | 88 | 6/22 | 31/194 |
+
+  False alarms in the 218 samples outside the buffered windows (all of them
+  in the two-day margins before eruptions): 7 at z >= 4 (peaks 4.0 to 7.3,
+  at most 19 pixels above threshold, several at twilight) and none at
+  z >= 8. Where the calendar records the onset time, the first z >= 8 sample
+  is the first hourly sample after it: Sundhnúkur 3 (06:07, hit 07:00), 4
+  (20:23, hit 21:00), 5 (12:45, hit 13:00), 6 (21:25, hit 22:00); Sundhnúkur
+  9 (03:54) was first seen at 06:00 after two fully cloudy samples.
+
+  Findings: (1) z >= 8 is the better operational threshold for `max_z` on
+  this model: it removes every false alarm and every pre-onset hit while
+  keeping 11 of 12 detections and the same onset hour for 9 of them. The
+  z >= 4 false alarms cluster at twilight, where the model is weakest.
+  (2) Cloud is the main limitation: during eruptions most clear samples are
+  detected (for example 37/41 in Sundhnúkur 5, 88/118 in Sundhnúkur 7),
+  while most cloudy ones are not. (3) Sundhnúkur 8, a small eruption of a
+  few hours under complete cloud, is not detected. (4) The Geldingadalir
+  onset under cloud only reaches z 4 to 8 for its first days. (5) The 218
+  quiet samples all sit in pre-eruption margins, so the false-alarm rate is
+  a rough estimate; a held-out sample of quiet days across all seasons is
+  needed for a proper one.
 
 ## 19. Milestone M7: SEVIRI rapid scan service (started 2026-11-15)
 
