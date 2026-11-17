@@ -12,6 +12,13 @@ on:
         description: re-process even if products exist
         type: boolean
         default: false
+      model_sat:
+        description: borrow another source's models (e.g. msg-0deg); empty for the source's own
+        default: ""
+      dry_run:
+        description: keep products and rows on the runner (uploaded as a workflow artifact)
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -39,5 +46,18 @@ jobs:
         if: ${{ inputs.sat == 'msg-rss' }}
         run: pip install -e ".[native]"
       - run: >
-          thermal process --sat "${{ inputs.sat }}" --time "${{ inputs.time }}"
+          thermal process --sat "${{ inputs.sat }}" --time "${{ inputs.time }}" --out out
           ${{ inputs.force && '--force' || '' }}
+          ${{ inputs.model_sat && format('--model-sat {0}', inputs.model_sat) || '' }}
+          ${{ inputs.dry_run && '--dry-run' || '' }}
+      - name: dry-run products (derived products only, no raw cutouts)
+        if: ${{ always() && inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dry-run
+          path: |
+            out/dry-run/public/
+            out/dry-run/private/products/
+            out/dry-run/private/timeseries/
+          retention-days: 7
+          if-no-files-found: warn

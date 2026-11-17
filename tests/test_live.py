@@ -169,3 +169,40 @@ def test_process_timestamp_remakes_rows_lost_before_a_flush(tmp_path):
     assert redo["ok"] and not redo.get("skipped")
     buf3.flush()
     assert len(timeseries.read_shard(storage, key)) == 1
+
+
+def test_dry_run_storage_keeps_writes_local(tmp_path):
+    from tests.test_backfill import FakeStorage
+    from thermal.storage import dry_run_storage
+
+    real = FakeStorage()
+    real.private.list_keys = lambda prefix, max_keys=None: []
+    real.private.put_json("models/msg-0deg/MSG4/latest.json", {"key": "k", "model_id": "m"})
+    dry = dry_run_storage(real, tmp_path / "dry")
+    dry.private.put_json("products/x/meta.json", {"a": 1})
+    dry.public.put_bytes("timeseries/s/r/2024-11.jsonl", b"{}\n")
+    # reads see the local writes, and fall through to the real bucket otherwise
+    assert dry.private.get_json("products/x/meta.json") == {"a": 1}
+    assert dry.private.get_json("models/msg-0deg/MSG4/latest.json")["model_id"] == "m"
+    assert dry.private.exists("products/x/meta.json")
+    assert dry.public.list_keys("timeseries/") == ["timeseries/s/r/2024-11.jsonl"]
+    # nothing reached the real buckets
+    assert real.private.get_json("products/x/meta.json") is None
+    assert (tmp_path / "dry/public/timeseries/s/r/2024-11.jsonl").exists()
+    import pytest
+
+    with pytest.raises(ValueError):
+        dry.private.put_bytes("../../escape", b"x")
+
+
+def test_model_cache_can_borrow_another_sources_models(tmp_path):
+    from tests.test_backfill import FakeStorage
+
+    storage = FakeStorage()
+    cache = live.ModelCache(storage, tmp_path, model_sat="msg-0deg")
+    try:
+        cache.get("msg-rss", "MSG4")
+    except RuntimeError as exc:
+        assert "msg-0deg/MSG4" in str(exc)
+    else:
+        raise AssertionError("expected no model")

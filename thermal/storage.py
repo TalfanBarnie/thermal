@@ -104,6 +104,77 @@ class Bucket:
         return io.BytesIO(self.get_bytes(key))
 
 
+class LocalWrites:
+    """A bucket whose writes go to a local directory; reads see those writes first and
+    otherwise fall through to the real bucket. Used for dry runs, so that nothing is
+    uploaded and nothing needs deleting afterwards."""
+
+    def __init__(self, bucket: Any, root: Path):
+        self._bucket = bucket
+        self.root = Path(root)
+        self.name = getattr(bucket, "name", "local")
+        self.written: list[str] = []
+
+    def _path(self, key: str) -> Path:
+        path = (self.root / key).resolve()
+        if not path.is_relative_to(self.root.resolve()):
+            raise ValueError(f"key escapes the dry-run directory: {key}")
+        return path
+
+    def put_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream"):
+        path = self._path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        if key not in self.written:
+            self.written.append(key)
+
+    def put_file(self, key: str, path: Path, content_type: str = "application/octet-stream"):
+        self.put_bytes(key, Path(path).read_bytes(), content_type)
+
+    def put_json(self, key: str, obj: Any):
+        self.put_bytes(key, json.dumps(obj, indent=1, sort_keys=True, default=str).encode())
+
+    def get_bytes(self, key: str) -> bytes:
+        path = self._path(key)
+        return path.read_bytes() if path.exists() else self._bucket.get_bytes(key)
+
+    def get_file(self, key: str, path: Path):
+        local = self._path(key)
+        if local.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(local.read_bytes())
+        else:
+            self._bucket.get_file(key, path)
+
+    def get_json(self, key: str, default: Any = None) -> Any:
+        path = self._path(key)
+        if path.exists():
+            return json.loads(path.read_bytes())
+        return self._bucket.get_json(key, default=default)
+
+    def exists(self, key: str) -> bool:
+        return self._path(key).exists() or self._bucket.exists(key)
+
+    def list_keys(self, prefix: str, max_keys: int | None = None) -> list[str]:
+        keys = sorted(
+            set(self._bucket.list_keys(prefix)) | {k for k in self.written if k.startswith(prefix)}
+        )
+        return keys[:max_keys] if max_keys else keys
+
+    def open_read(self, key: str) -> io.BytesIO:
+        return io.BytesIO(self.get_bytes(key))
+
+
+def dry_run_storage(storage: Any, root: Path) -> Any:
+    """The same storage, with every write to either bucket kept under `root`."""
+    import copy
+
+    dry = copy.copy(storage)
+    dry.private = LocalWrites(storage.private, Path(root) / "private")
+    dry.public = LocalWrites(storage.public, Path(root) / "public")
+    return dry
+
+
 class Storage:
     def __init__(self, settings: Settings):
         self.private = Bucket(settings.b2_private, settings.b2_endpoint)

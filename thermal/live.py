@@ -31,17 +31,21 @@ def nominal_time_from_id(product_id: str, cadence_minutes: int) -> datetime | No
 
 
 class ModelCache:
-    def __init__(self, storage: Storage, cache_dir: Path):
+    def __init__(self, storage: Storage, cache_dir: Path, model_sat: str | None = None):
+        """`model_sat` borrows another source's models (e.g. the 0 deg ones for an RSS
+        test before RSS models exist)."""
         self.storage = storage
         self.cache_dir = cache_dir
+        self.model_sat = model_sat
         self._models: dict[tuple[str, str], tuple[BackgroundModel, str]] = {}
 
     def get(self, sat_key: str, platform: str) -> tuple[BackgroundModel, str]:
         k = (sat_key, platform)
         if k not in self._models:
-            pointer = self.storage.private.get_json(f"models/{sat_key}/{platform}/latest.json")
+            source = self.model_sat or sat_key
+            pointer = self.storage.private.get_json(f"models/{source}/{platform}/latest.json")
             if not pointer:
-                raise RuntimeError(f"no background model for {sat_key}/{platform}")
+                raise RuntimeError(f"no background model for {source}/{platform}")
             path = self.cache_dir / pointer["key"]
             if not path.exists():
                 self.storage.private.get_file(pointer["key"], path)

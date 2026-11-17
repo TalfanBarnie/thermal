@@ -168,10 +168,20 @@ def cmd_process(args) -> int:
     sat = config.satellite(args.sat)
     storage = Storage(settings)
     out_dir = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix="thermal-"))
-    cache = ModelCache(storage, out_dir / "models")
+    if args.dry_run:
+        from .storage import dry_run_storage
+
+        storage = dry_run_storage(storage, out_dir / "dry-run")
+    cache = ModelCache(storage, out_dir / "models", model_sat=args.model_sat)
     result = process_timestamp(
         _client(settings), storage, sat, parse_time(args.time), cache, out_dir, force=args.force
     )
+    if args.dry_run:
+        result["dry_run"] = {
+            "dir": str(out_dir / "dry-run"),
+            "private": storage.private.written,
+            "public": storage.public.written,
+        }
     print(redact(json.dumps(result, indent=1, default=str)))
     return 0 if result.get("ok") else 1
 
@@ -407,6 +417,10 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--time", required=True)
     pc.add_argument("--out")
     pc.add_argument("--force", action="store_true", help="re-process even if products exist")
+    pc.add_argument("--model-sat", help="use this source's models (e.g. msg-0deg for an RSS test)")
+    pc.add_argument(
+        "--dry-run", action="store_true", help="keep every write local under <out>/dry-run"
+    )
     pc.set_defaults(func=cmd_process)
 
     lv = sub.add_parser("live", help="process new timestamps since the stored state")
