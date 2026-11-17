@@ -12,7 +12,9 @@ satpy is an optional dependency (`pip install -e ".[native]"`); it is imported l
 
 from __future__ import annotations
 
+import functools
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -205,6 +207,23 @@ def mask_outside_box(ds: xr.Dataset, roi_nswe: list[float]) -> xr.Dataset:
     return ds
 
 
+# eccodes (the GRIB decoder behind the cloud mask reader) is not thread-safe: batch runs
+# crop in several threads at once and crashed with segmentation faults. All satpy
+# reading and cropping is therefore done one at a time; it takes about 3 s per
+# timestamp against 6 to 20 s of downloading, so little throughput is lost.
+_SATPY_LOCK = threading.Lock()
+
+
+def _serialised(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with _SATPY_LOCK:
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
+@_serialised
 def crop_native(nat_path: Path, roi_nswe: list[float], out_nc: Path, product_name: str) -> Path:
     """Crop a native SEVIRI file to the N, S, W, E box and write a cutout netCDF."""
     from satpy import Scene
@@ -312,6 +331,7 @@ def place_on_image_grid(
     return geo.nearest_on_grid(values, x, y, img_x, img_y), img_x, img_y, proj
 
 
+@_serialised
 def crop_cloud_mask(
     grb_path: Path,
     roi_nswe: list[float],

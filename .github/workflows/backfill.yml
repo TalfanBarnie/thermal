@@ -95,8 +95,10 @@ jobs:
           fi
           echo "remaining=$(python -c "import json;print(json.load(open('$RUNNER_TEMP/summary.json'))['remaining'])")" >> "$GITHUB_OUTPUT"
       - name: re-dispatch while work remains
-        # Runs even if the job was cancelled by its timeout: a missing summary counts as "work remains".
-        if: ${{ always() && inputs.chain && steps.backfill.outputs.remaining != '0' }}
+        # Runs even if the backfill step crashed or the job hit its timeout: a missing summary
+        # counts as "work remains". (A missing output is null, and null != '0' is false in
+        # GitHub expressions because both sides are coerced to the number 0.)
+        if: ${{ always() && inputs.chain && (steps.backfill.outputs.remaining || 'unknown') != '0' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: >

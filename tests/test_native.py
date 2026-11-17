@@ -253,3 +253,29 @@ def test_native_cutouts_are_stored_and_stale_ones_replaced(tmp_path, monkeypatch
     report = pipeline.fetch_timestamp(None, storage, sat, t, tmp_path / "b", summarise=False)
     assert report["ok"] and calls == []
     assert "reused_key" in report["products"]["l15"]
+
+
+def test_satpy_cropping_is_serialised():
+    """eccodes is not thread-safe, so the crops must never run concurrently."""
+    import threading
+    import time
+
+    active, peak = [0], [0]
+    lock = threading.Lock()
+
+    @native._serialised
+    def crop():
+        with lock:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        time.sleep(0.02)
+        with lock:
+            active[0] -= 1
+
+    threads = [threading.Thread(target=crop) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert peak[0] == 1
+    assert native.crop_native.__wrapped__ and native.crop_cloud_mask.__wrapped__
