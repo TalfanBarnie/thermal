@@ -929,6 +929,11 @@ Steps, in order:
    locally (its `source` attribute); an older one is fetched again and
    overwritten. `already_stored` is therefore never true for native sources,
    so the fetch itself checks what is stored.
+   Step 7 lists: timestamps in the two known MSG4 RSS outages (2024-02-01 to
+   2024-02-29, i.e. all of Sundhnúkur 3, and 2025-01-30 to 2025-02-27) were
+   removed from the RSS lists (onsets 7,776 to 6,912, rest 44,928 to 44,064,
+   MSG4 training 1,000 to 984): they all fail with "no product found".
+   Sundhnúkur 3 is covered by the 0 deg series only.
 2. Fetch the Meteosat-11 RSS training set: `backfill.yml` with sat
    `msg-rss`, job_id `rss-msg4-train`, list
    `data/samples/msg-rss_msg4_train.csv`, mode fetch, chain true. The
