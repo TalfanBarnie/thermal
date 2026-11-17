@@ -946,6 +946,27 @@ Steps, in order:
    platform `MSG4`, list `data/samples/msg-rss_msg4_train.csv`, check_time
    `2024-11-21T01:00:00Z` (clear night, saturated hotspot). The model lands
    at `models/msg-rss/MSG4/latest.json`, separate from the 0° models.
+   **Done 2026-11-17**: 912 cutouts (914 fetched of 984; 73 timestamps had no
+   RSS product after three tries, scattered single gaps 2023 to 2026),
+   3.64 M pixels, 409 training and 102 held-out days (no February in the
+   training split: two of the three MSG4 Februaries are RSS outages).
+   Held-out IR3.9 brightness temperature against the 0° Meteosat-11 model:
+
+   | Model | All RMSE / MAD | Day | Twilight | Night | z std (within 2) |
+   |---|---|---|---|---|---|
+   | RSS MLP 3x128 | 2.49 / 1.08 K | 3.27 | 2.14 | 1.85 | 1.16 (92%) |
+   | RSS ridge deg 2 | 4.47 / 1.94 K | 4.28 | 4.55 | 4.56 | 2.04 |
+   | 0° MLP (MSG4) | 2.28 / 1.02 K | 2.71 | 2.19 | 1.77 | 1.16 (92%) |
+
+   The MLP is promoted (`mlp_20261117T225716`, early-stopped after 15
+   epochs). Twilight and night match the 0° model; daytime is about 0.5 K
+   worse, plausibly the more oblique view (76.5 deg against 74.3 deg) with
+   more solar reflection in the 3.9 um band. May to July are worst (3.0 to
+   3.4 K), November best (1.3 K), as for 0°. The detection check did not
+   run: the Data Store answered 504 Gateway Time-out for the 01:00 product
+   for 25 minutes (alongside "maximum number of connections exceeded"
+   while the onsets backfill ran at concurrency 6), and the run was
+   cancelled. Re-run it later with `process-one` (dry run).
 5. Process the onsets (`mode process`, `only_stored true`, job_id
    `rss-eruptions-onsets-process`) and compare the RSS time series with the
    0° one at matching times: onset times, peak z, saturation counts.
