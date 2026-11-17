@@ -61,6 +61,7 @@ def fetch_timestamp(
         "products": {},
         "ok": True,
     }
+    local_paths: dict[str, Path] = {}
     for kind, coll_id, tailor_product in kinds_for(sat, cloudmask):
         entry: dict[str, Any] = {"collection": coll_id, "tailor_product": tailor_product}
         report["products"][kind] = entry
@@ -72,7 +73,7 @@ def fetch_timestamp(
                 storage.private.get_file(key, nc_path)
                 entry["reused_key"] = key
                 log.info("%s %s: reusing %s", sat["key"], t.isoformat(), key)
-            elif kind == "l15" and sat.get("l15_method") == "native":
+            elif sat.get(f"{kind}_method") == "native":
                 entry["method"] = "native"
                 nc_path = _native_with_retries(
                     client,
@@ -85,6 +86,8 @@ def fetch_timestamp(
                     retries,
                     retry_wait_s,
                     deadline=deadline,
+                    kind=kind,
+                    image_nc=local_paths.get("l15"),
                 )
             else:
                 nc_path = _tailor_with_retries(
@@ -104,6 +107,7 @@ def fetch_timestamp(
                     entry["stored_key"] = key
                     log.info("stored %s", key)
             entry["local_path"] = str(nc_path)
+            local_paths[kind] = nc_path
             if summarise:
                 entry["summary"] = inspect.summarise(nc_path)
             if quicklook:
@@ -143,8 +147,14 @@ def _native_with_retries(
     retries,
     retry_wait_s,
     deadline=None,
+    kind: str = "l15",
+    image_nc: Path | None = None,
 ) -> Path:
-    """Download the native .nat file and crop it locally (see thermal/native.py)."""
+    """Download the original product and crop it locally (see thermal/native.py).
+
+    kind "l15": the `.nat` image file; kind "clm": the cloud mask GRIB, put on the grid of
+    `image_nc` (the image cutout of the same timestamp) when it is available.
+    """
     from . import native
 
     product = client.product_at(
@@ -160,12 +170,18 @@ def _native_with_retries(
             if _past(deadline):
                 raise TimeoutError("batch deadline reached before the download started")
             t0 = time.monotonic()
-            nat = native.download_native(product, out_dir / "native")
-            t1 = time.monotonic()
-            nc = native.crop_native(nat, roi, out_dir / f"{product}_cutout.nc", f"{product}.nat")
+            out_nc = out_dir / f"{product}_cutout.nc"
+            if kind == "clm":
+                nat = native.download_cloud_mask(product, out_dir / "native")
+                t1 = time.monotonic()
+                nc = native.crop_cloud_mask(nat, roi, out_nc, f"{product}.grb", image_nc=image_nc)
+            else:
+                nat = native.download_native(product, out_dir / "native")
+                t1 = time.monotonic()
+                nc = native.crop_native(nat, roi, out_nc, f"{product}.nat")
             entry["native"] = {
                 "attempt": attempt + 1,
-                "nat_bytes": nat.stat().st_size,
+                "file_bytes": nat.stat().st_size,
                 "download_s": round(t1 - t0, 1),
                 "crop_s": round(time.monotonic() - t1, 1),
             }

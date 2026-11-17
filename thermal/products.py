@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -10,9 +11,11 @@ from typing import Any
 import numpy as np
 import xarray as xr
 
-from . import render
+from . import geo, render
 from .features import FeatureSet
 from .storage import Storage, time_stamp
+
+log = logging.getLogger(__name__)
 
 # Fixed colour scales so that images are comparable between timestamps (radiance units).
 PNG_SCALES: dict[str, tuple[float | None, float | None]] = {
@@ -40,6 +43,34 @@ def saturation_radiance(ds: xr.Dataset, variable: str) -> float | None:
     return offset + slope * 1023.0
 
 
+def cloud_on_image_grid(
+    clm_path: Path | None, l15_path: Path, sat: dict[str, Any]
+) -> np.ndarray | None:
+    """The cloud mask as an array on the image cutout's grid, or None if unavailable.
+
+    A mask with the image's shape is used as it is (Data Tailor 0 degree cutouts are cut
+    on the same grid). A mask of a different shape is aligned on projection coordinates;
+    one that cannot be aligned is treated as unavailable rather than failing the timestep.
+    """
+    if clm_path is None or not clm_path.exists():
+        return None
+    var = sat.get("cloudmask_variable", "cloud_mask")
+    with xr.open_dataset(l15_path, decode_times=False) as img:
+        shape = tuple(int(n) for n in (img.sizes["y"], img.sizes["x"]))
+        img_x = np.asarray(img["x"].values) if "x" in img.coords else None
+        img_y = np.asarray(img["y"].values) if "y" in img.coords else None
+    with xr.open_dataset(clm_path, decode_times=False) as ds:
+        cloud = np.asarray(ds[var].values, dtype=float)
+        if cloud.shape == shape:
+            return cloud
+        if img_x is None or img_y is None or "x" not in ds.coords or "y" not in ds.coords:
+            log.warning("cloud mask %s does not match the image grid %s", cloud.shape, shape)
+            return None
+        aligned = geo.nearest_on_grid(cloud, ds["x"].values, ds["y"].values, img_x, img_y)
+    log.info("cloud mask %s aligned to the image grid %s", cloud.shape, shape)
+    return aligned
+
+
 def build_products(
     images: dict[str, np.ndarray],
     fs: FeatureSet,
@@ -54,10 +85,7 @@ def build_products(
         sat_rad = saturation_radiance(ds, mir_var)
         ir108 = np.asarray(ds[inv["IR_108"]].values, dtype=float) if "IR_108" in inv else None
         vis06 = np.asarray(ds[inv["VIS006"]].values, dtype=float) if "VIS006" in inv else None
-    cloud = None
-    if clm_path is not None and clm_path.exists():
-        with xr.open_dataset(clm_path, decode_times=False) as ds:
-            cloud = np.asarray(ds[sat.get("cloudmask_variable", "cloud_mask")].values, dtype=float)
+    cloud = cloud_on_image_grid(clm_path, l15_path, sat)
     observed = images["observed"]
     saturated = (
         np.isfinite(observed) & (observed >= 0.995 * sat_rad)

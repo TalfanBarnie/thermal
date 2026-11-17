@@ -124,14 +124,11 @@ def cmd_predict(args) -> int:
         storage.private.get_file(pointer["key"], model_path)
     model = BackgroundModel.load(model_path)
     images = anomaly.predict_images(model, fs)
-    cloud = None
-    clm_entry = report["products"].get("clm", {})
-    clm = Path(clm_entry["local_path"]) if "local_path" in clm_entry else out_dir / "no-clm"
-    if clm.exists():
-        import xarray as xr
+    from .products import cloud_on_image_grid
 
-        with xr.open_dataset(clm, decode_times=False) as ds:
-            cloud = np.asarray(ds[sat.get("cloudmask_variable", "cloud_mask")].values, dtype=float)
+    clm_entry = report["products"].get("clm", {})
+    clm = Path(clm_entry["local_path"]) if "local_path" in clm_entry else None
+    cloud = cloud_on_image_grid(clm, l15, sat)
     stats = [
         anomaly.region_stats(images, fs, r, cloud_mask=cloud) for r in anomaly.default_regions(sat)
     ]

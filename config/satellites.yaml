@@ -28,10 +28,13 @@ msg-rss:
   collection: EO:EUM:DAT:MSG:MSG15-RSS
   cloudmask_collection: EO:EUM:DAT:MSG:RSS-CLM
   tailor_product: HRSEVIRI            # not used for l15: see l15_method
-  tailor_cloudmask_product: MSGCLMK   # verified 2026-11-15: correct grid
+  tailor_cloudmask_product: MSGCLMK   # not used: see clm_method
   # The Data Tailor mis-georeferences RSS level 1.5 images (SPEC section 19), so the
   # native .nat file is downloaded and cropped locally with satpy (thermal/native.py).
   l15_method: native
+  # Cloud masks are downloaded too (GRIB, satpy seviri_l2_grib) and put on the image
+  # grid; the Data Tailor's RSS masks are correct but cut on a different grid.
+  clm_method: native
   platform_filter: null
   sub_lon: 9.5
   cadence_minutes: 5

@@ -46,27 +46,34 @@ def native_entry(product: Any) -> str:
     return names[0]
 
 
-def extract_native(zip_path: Path, out_dir: Path) -> Path:
-    """Extract the `.nat` member of a Data Store product zip into out_dir."""
+def extract_member(zip_path: Path, out_dir: Path, suffix: str, name: str | None = None) -> Path:
+    """Extract the first member ending in `suffix` from a product zip into out_dir.
+
+    `name` renames the extracted file (satpy picks readers by file name pattern).
+    """
     import zipfile
 
     with zipfile.ZipFile(zip_path) as zf:
-        names = [n for n in zf.namelist() if n.lower().endswith(".nat")]
+        names = [n for n in zf.namelist() if n.lower().endswith(suffix)]
         if not names:
-            raise RuntimeError(f"no .nat member in {zip_path.name}: {zf.namelist()}")
-        target = out_dir / Path(names[0]).name
+            raise RuntimeError(f"no {suffix} member in {zip_path.name}: {zf.namelist()}")
+        target = out_dir / (name or Path(names[0]).name)
         with zf.open(names[0]) as src, open(target, "wb") as dst:
             for chunk in iter(lambda: src.read(4 * 1024 * 1024), b""):
                 dst.write(chunk)
     return target
 
 
-def download_native(product: Any, out_dir: Path) -> Path:
-    """Download the product zip, extract its `.nat` file into out_dir and return its path.
+def extract_native(zip_path: Path, out_dir: Path) -> Path:
+    """Extract the `.nat` member of a Data Store product zip into out_dir."""
+    return extract_member(zip_path, out_dir, ".nat")
 
-    The zip is about a third of the size of the uncompressed `.nat` that the per-entry
-    endpoint serves (36 MB against 102 MB for an RSS image), so this is the lighter route.
-    The zip is deleted once the `.nat` is extracted.
+
+def download_member(product: Any, out_dir: Path, suffix: str, name: str | None = None) -> Path:
+    """Download the product zip, extract its `suffix` file into out_dir and return its path.
+
+    The zip is the lighter route: for an RSS image it is 36 MB against the 102 MB `.nat`
+    that the per-entry endpoint serves uncompressed. The zip is deleted after extraction.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     zip_path = out_dir / f"{product}.zip"
@@ -77,17 +84,27 @@ def download_native(product: Any, out_dir: Path) -> Path:
     zip_mb = zip_path.stat().st_size / 1e6
     t1 = time.monotonic()
     try:
-        target = extract_native(zip_path, out_dir)
+        target = extract_member(zip_path, out_dir, suffix, name)
     finally:
         zip_path.unlink(missing_ok=True)
     log.info(
-        "downloaded %s (%.1f MB zip in %.1f s, extracted in %.1f s)",
+        "downloaded %s (%.2f MB zip in %.1f s, extracted in %.1f s)",
         target.name,
         zip_mb,
         t1 - t0,
         time.monotonic() - t1,
     )
     return target
+
+
+def download_native(product: Any, out_dir: Path) -> Path:
+    """Download a level 1.5 product and return its extracted `.nat` file."""
+    return download_member(product, out_dir, ".nat")
+
+
+def download_cloud_mask(product: Any, out_dir: Path) -> Path:
+    """Download a cloud mask product and return its GRIB file, named as satpy expects."""
+    return download_member(product, out_dir, ".grb", name=f"{product}.grb")
 
 
 def cutout_dataset(
@@ -199,15 +216,7 @@ def crop_native(nat_path: Path, roi_nswe: list[float], out_nc: Path, product_nam
     first = cropped[SEVIRI_CHANNELS[0]]
     area = first.attrs["area"]
     x, y = area.get_proj_vectors()
-    crs = area.crs.to_dict()
-    a = float(crs.get("a", 6378169.0))
-    if "b" in crs:
-        b = float(crs["b"])
-    elif "rf" in crs:
-        b = a * (1.0 - 1.0 / float(crs["rf"]))
-    else:
-        b = 6356583.8
-    proj = {"h": float(crs["h"]), "lon_0": float(crs.get("lon_0", 0.0)), "a": a, "b": b}
+    proj = _proj_of(area)
     radiances = {}
     for ch in SEVIRI_CHANNELS:
         da = cropped[ch]
@@ -231,4 +240,92 @@ def crop_native(nat_path: Path, roi_nswe: list[float], out_nc: Path, product_nam
     out_nc.parent.mkdir(parents=True, exist_ok=True)
     ds.to_netcdf(out_nc)
     log.info("cropped %s to %s (%d x %d)", nat_path.name, out_nc.name, y.size, x.size)
+    return out_nc
+
+
+CLOUD_NO_DATA = 3  # flag value of the MSG cloud mask meaning "no data"
+
+
+def cloud_mask_dataset(
+    values: np.ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
+    proj: dict[str, float],
+    product_name: str,
+) -> xr.Dataset:
+    """Data-Tailor-compatible cloud mask cutout: 0 clear sea, 1 clear land, 2 cloud, NaN
+    no data (the product's flag 3 and anything outside the source grid)."""
+    v = np.asarray(values, dtype=np.float32).copy()
+    v[v == CLOUD_NO_DATA] = np.nan
+    if v.shape != (y.size, x.size):
+        raise ValueError(f"cloud mask has shape {v.shape}, expected {(y.size, x.size)}")
+    ds = cutout_dataset({}, x, y, proj, {}, product_name)
+    ds["cloud_mask"] = xr.DataArray(
+        v,
+        dims=("y", "x"),
+        attrs={
+            "long_name": "cloud_mask",
+            "short_name": "cloud_mask",
+            "grid_mapping": "geostationary",
+            "comment": "0 clear sky over water, 1 clear sky over land, 2 cloudy, NaN no data",
+        },
+    )
+    ds.attrs["source"] = "satpy seviri_l2_grib, cropped locally (Data Tailor bypassed)"
+    ds.attrs.pop("radiometric_parameters_format", None)
+    return ds
+
+
+def _proj_of(area: Any) -> dict[str, float]:
+    crs = area.crs.to_dict()
+    a = float(crs.get("a", 6378169.0))
+    if "b" in crs:
+        b = float(crs["b"])
+    elif "rf" in crs:
+        b = a * (1.0 - 1.0 / float(crs["rf"]))
+    else:
+        b = 6356583.8
+    return {"h": float(crs["h"]), "lon_0": float(crs.get("lon_0", 0.0)), "a": a, "b": b}
+
+
+def crop_cloud_mask(
+    grb_path: Path,
+    roi_nswe: list[float],
+    out_nc: Path,
+    product_name: str,
+    image_nc: Path | None = None,
+) -> Path:
+    """Crop a cloud mask GRIB file to the box and write a cutout netCDF.
+
+    With `image_nc` (the image cutout of the same timestamp) the mask is put exactly on
+    the image's grid, so the two can be overlaid pixel for pixel; without it the mask is
+    cropped to the box on its own grid.
+    """
+    from satpy import Scene
+
+    from . import geo
+
+    north, south, west, east = roi_nswe
+    scn = Scene(filenames=[str(grb_path)], reader="seviri_l2_grib")
+    scn.load(["cloud_mask"], upper_right_corner="NE")
+    # crop with a margin so the image grid is fully covered before alignment
+    cropped = scn.crop(ll_bbox=(west - 2.0, south - 1.0, east + 2.0, north + 1.0))
+    da = cropped["cloud_mask"]
+    area = da.attrs["area"]
+    x, y = area.get_proj_vectors()
+    values = np.asarray(da.values, dtype=float)
+    values[values == CLOUD_NO_DATA] = np.nan
+    proj = _proj_of(area)
+    if image_nc is not None:
+        with xr.open_dataset(image_nc, decode_times=False) as img:
+            img_x = np.asarray(img["x"].values)
+            img_y = np.asarray(img["y"].values)
+        values = geo.nearest_on_grid(values, x, y, img_x, img_y)
+        x, y = img_x, img_y
+    ds = cloud_mask_dataset(values, x, y, proj, product_name)
+    lat, lon, _ = geo.geolocate(ds)
+    inside = (lat >= south) & (lat <= north) & (lon >= west) & (lon <= east)
+    ds["cloud_mask"] = ds["cloud_mask"].where(inside)
+    out_nc.parent.mkdir(parents=True, exist_ok=True)
+    ds.to_netcdf(out_nc)
+    log.info("cropped %s to %s (%d x %d)", grb_path.name, out_nc.name, y.size, x.size)
     return out_nc

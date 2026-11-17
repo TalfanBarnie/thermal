@@ -27,7 +27,7 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.5", "scikit-learn>=1.4"]
 train = ["torch", "scikit-learn", "pandas", "pyarrow"]
 analysis = ["cmdstanpy", "pandas", "pyarrow", "matplotlib"]
-native = ["satpy>=0.50", "pyresample>=1.28"]  # local cropping of native SEVIRI files (RSS)
+native = ["satpy>=0.50", "pyresample>=1.28", "eccodes>=2.38"]  # local cropping of native SEVIRI files (RSS)
 
 [project.scripts]
 thermal = "thermal.cli:main"

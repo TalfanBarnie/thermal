@@ -873,9 +873,13 @@ lands on the image grid.
 
 Steps, in order:
 
-1. (If switching) implement the direct cloud mask route behind a
-   `clm_method: native` key in `config/satellites.yaml`, mirroring
-   `l15_method`, with a unit test like `tests/test_native.py`.
+1. Done 2026-11-17: direct cloud mask route (`clm_method: native`, GRIB read
+   with satpy's `seviri_l2_grib` reader and eccodes, put on the image
+   cutout's grid by projection coordinates). Switching was required, not
+   optional: the Data Tailor's RSS masks are 50 x 203 pixels against 50 x 201
+   for the native images, and the products step overlays mask and image
+   pixel for pixel. The products step now also aligns any mask of a different
+   shape by coordinates (or treats it as unavailable) instead of failing.
 2. Fetch the Meteosat-11 RSS training set: `backfill.yml` with sat
    `msg-rss`, job_id `rss-msg4-train`, list
    `data/samples/msg-rss_msg4_train.csv`, mode fetch, chain true. The

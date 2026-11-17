@@ -101,3 +101,84 @@ def test_mask_outside_box_matches_tailor(tmp_path):
     for i in range(1, 12):
         v = masked[f"channel_{i}"].values
         assert np.isfinite(v[inside]).all() and np.isnan(v[~inside]).all()
+
+
+def test_nearest_on_grid_aligns_offset_grids():
+    src_x = np.arange(10) * 3000.0
+    src_y = 100000.0 - np.arange(6) * 3000.0
+    vals = np.arange(60, dtype=float).reshape(6, 10)
+    # destination: columns 2..5 and rows 1..3, with a small sub-pixel offset, plus one
+    # column beyond the source extent
+    dst_x = np.array([2, 3, 4, 5, 12]) * 3000.0 + 400.0
+    dst_y = 100000.0 - np.array([1, 2, 3]) * 3000.0 - 300.0
+    out = geo.nearest_on_grid(vals, src_x, src_y, dst_x, dst_y)
+    assert out.shape == (3, 5)
+    np.testing.assert_array_equal(out[:, :4], vals[1:4, 2:6])
+    assert np.isnan(out[:, 4]).all()
+
+
+def test_cloud_mask_dataset_maps_no_data_to_nan():
+    x = np.arange(4) * 3000.0
+    y = 5.0e6 - np.arange(3) * 3000.0
+    vals = np.array([[0, 1, 2, 3], [2, 2, 3, 1], [0, 0, 1, 2]], dtype=float)
+    ds = native.cloud_mask_dataset(
+        vals, x, y, {"h": H, "lon_0": 9.5, "a": A, "b": B}, "MSG4-SEVI-MSGCLMK-x.grb"
+    )
+    cm = ds["cloud_mask"].values
+    assert np.isnan(cm[0, 3]) and np.isnan(cm[1, 2])
+    assert np.nansum(cm == 2) == 4
+    assert ds["cloud_mask"].attrs["grid_mapping"] == "geostationary"
+    assert "x" in ds.coords and "y" in ds.coords
+
+
+def _mask_like(image_path, path, extra_cols=0, shift_cols=0, with_coords=True):
+    with xr.open_dataset(image_path, decode_times=False) as img:
+        x = np.asarray(img["x"].values)
+        y = np.asarray(img["y"].values)
+    step = x[1] - x[0]
+    xs = x[0] + (np.arange(x.size + extra_cols) - shift_cols) * step
+    rng = np.random.default_rng(1)
+    vals = rng.integers(0, 3, size=(y.size, xs.size)).astype(float)
+    coords = {"x": ("x", xs), "y": ("y", y)} if with_coords else {}
+    xr.Dataset({"cloud_mask": (("y", "x"), vals)}, coords=coords).to_netcdf(path)
+    return vals, xs, y
+
+
+def test_cloud_on_image_grid(tmp_path):
+    from tests.synthetic import make_cutout
+
+    image = make_cutout(tmp_path / "l15.nc")
+    sat = config.satellite("msg-0deg")
+    # same shape: used as it is
+    same, _, _ = _mask_like(image, tmp_path / "same.nc")
+    np.testing.assert_array_equal(
+        products.cloud_on_image_grid(tmp_path / "same.nc", image, sat), same
+    )
+    # wider and shifted by one column (like the Data Tailor's 203 against 201): aligned
+    wide, _, _ = _mask_like(image, tmp_path / "wide.nc", extra_cols=2, shift_cols=1)
+    aligned = products.cloud_on_image_grid(tmp_path / "wide.nc", image, sat)
+    np.testing.assert_array_equal(aligned, wide[:, 1:-1])
+    # different shape and no coordinates: unavailable rather than an error
+    _mask_like(image, tmp_path / "bare.nc", extra_cols=2, with_coords=False)
+    assert products.cloud_on_image_grid(tmp_path / "bare.nc", image, sat) is None
+
+
+def test_pipeline_routes_rss_cloud_mask_natively(tmp_path, monkeypatch):
+    from thermal import pipeline
+
+    calls = []
+
+    def fake(client, sat, t, coll_id, roi, out_dir, entry, *a, kind="l15", image_nc=None, **k):
+        calls.append((kind, image_nc))
+        path = tmp_path / f"{kind}.nc"
+        path.write_bytes(b"")
+        return path
+
+    monkeypatch.setattr(pipeline, "_native_with_retries", fake)
+    sat = config.satellite("msg-rss")
+    report = pipeline.fetch_timestamp(
+        None, None, sat, datetime(2024, 11, 21, 1, tzinfo=UTC), tmp_path, summarise=False
+    )
+    assert report["ok"]
+    assert [c[0] for c in calls] == ["l15", "clm"]
+    assert calls[1][1] == tmp_path / "l15.nc"  # the mask is put on the image grid

@@ -170,3 +170,36 @@ def geolocate(ds: xr.Dataset) -> tuple[np.ndarray, np.ndarray, str]:
     lon = np.where(np.isfinite(lon) & (np.abs(lon) < 1e30), lon, np.nan)
     lat = np.where(np.isfinite(lat) & (np.abs(lat) < 1e30), lat, np.nan)
     return lat, lon, f"geos projection via {grid_var.name}"
+
+
+def nearest_on_grid(
+    values: np.ndarray,
+    src_x: np.ndarray,
+    src_y: np.ndarray,
+    dst_x: np.ndarray,
+    dst_y: np.ndarray,
+    tol: float = 0.5,
+) -> np.ndarray:
+    """Values of a regular source grid at the pixel centres of a destination grid.
+
+    Both grids are given by their 1-D projection coordinates (x along columns, y along
+    rows). Each destination pixel takes the nearest source pixel in x and in y; pixels
+    with no source centre within `tol` source pixels are NaN. Used to put a cloud mask
+    on its image's grid when the two cutouts differ in extent.
+    """
+    values = np.asarray(values, dtype=float)
+    src_x, src_y = np.asarray(src_x, float), np.asarray(src_y, float)
+    dst_x, dst_y = np.asarray(dst_x, float), np.asarray(dst_y, float)
+
+    def index(src: np.ndarray, dst: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        step = np.median(np.abs(np.diff(src))) if src.size > 1 else 1.0
+        idx = np.abs(src[None, :] - dst[:, None]).argmin(axis=1)
+        ok = np.abs(src[idx] - dst) <= tol * step
+        return idx, ok
+
+    ix, okx = index(src_x, dst_x)
+    iy, oky = index(src_y, dst_y)
+    out = values[np.ix_(iy, ix)]
+    out[~oky, :] = np.nan
+    out[:, ~okx] = np.nan
+    return out
