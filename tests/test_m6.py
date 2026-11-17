@@ -57,7 +57,7 @@ def test_backfill_process_mode(monkeypatch):
     ts = [datetime(2024, 1, 1, h, tzinfo=UTC) for h in range(3)]
     calls = []
 
-    def fake_process(client, storage_, sat_, t, cache, out_dir, force=False):
+    def fake_process(client, storage_, sat_, t, cache, out_dir, force=False, **kw):
         calls.append((t, force))
         return (
             {"ok": True, "platform": "MSG3", "model": "m"}
@@ -99,10 +99,64 @@ def test_backfill_only_stored(monkeypatch):
     monkeypatch.setattr(
         live,
         "process_timestamp",
-        lambda c, s_, sat_, t, cache, out, force=False: (calls.append(t), {"ok": True})[1],
+        lambda c, s_, sat_, t, cache, out, force=False, **kw: (calls.append(t), {"ok": True})[1],
     )
     monkeypatch.setattr(live, "ModelCache", lambda s_, d: None)
     s = backfill.run_backfill(
         None, storage, sat, ts, "p", max_minutes=5, concurrency=1, mode="process", only_stored=True
     )
     assert calls == [ts[1]] and s["skipped_unstored"] == 2 and s["done"] == 1
+
+
+def test_backfill_process_mode_marks_done_after_flush(monkeypatch):
+    from tests.test_backfill import FakeStorage
+    from thermal import timeseries
+
+    storage = FakeStorage()
+    storage.public.list_keys = lambda prefix, max_keys=None: []
+    sat = {"key": "msg-rss", "cadence_minutes": 5, "monitoring_regions": ["reykjanes"]}
+    ts = [datetime(2024, 11, 21, 0, 5 * i, tzinfo=UTC) for i in range(5)]
+
+    def fake_process(client, storage_, sat_, t, cache, out_dir, force=False, rows_sink=None):
+        rows_sink.add(
+            [{"time": t.strftime("%Y-%m-%dT%H:%M:%SZ"), "sat": "msg-rss", "region": "reykjanes"}]
+        )
+        return {"ok": True, "platform": "MSG4", "model": "m"}
+
+    monkeypatch.setattr(live, "process_timestamp", fake_process)
+    monkeypatch.setattr(live, "ModelCache", lambda storage_, d: None)
+    s = backfill.run_backfill(
+        None,
+        storage,
+        sat,
+        ts,
+        "rss",
+        max_minutes=10,
+        concurrency=1,
+        mode="process",
+        flush_every=2,
+    )
+    assert s["done"] == 5
+    shard = timeseries.read_shard(storage, "timeseries/msg-rss/reykjanes/2024-11.jsonl")
+    assert len(shard) == 5
+
+    # a flush that fails leaves its timestamps not done, to be re-made next run
+    storage2 = FakeStorage()
+    storage2.public.list_keys = lambda prefix, max_keys=None: []
+
+    def broken_flush(self):
+        raise RuntimeError("upload failed")
+
+    monkeypatch.setattr(timeseries.ShardBuffer, "flush", broken_flush)
+    s2 = backfill.run_backfill(
+        None,
+        storage2,
+        sat,
+        ts,
+        "rss2",
+        max_minutes=10,
+        concurrency=1,
+        mode="process",
+        flush_every=100,
+    )
+    assert s2["done"] == 0 and s2["remaining"] == 5

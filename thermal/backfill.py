@@ -93,6 +93,8 @@ def run_backfill(
     sat_config: dict[str, Any] | None = None,
     grace_minutes: float = 10.0,
     only_stored: bool = False,
+    flush_every: int = 100,
+    flush_seconds: float = 300.0,
 ) -> dict[str, Any]:
     """Run every timestamp not yet done, within a wall-clock budget. Returns a summary.
 
@@ -101,15 +103,21 @@ def run_backfill(
     products are re-made (used after a retrain). With only_stored=True, timestamps whose
     image cutout is not yet in the bucket are left for later instead of fetched (no Data
     Tailor use at all). State is per job id and resumable.
+
+    In process mode the time series rows go into a ShardBuffer that is flushed every
+    `flush_every` timestamps or `flush_seconds`, whichever comes first, and at the end;
+    a timestamp is only marked done once its rows have been written.
     """
     if mode not in ("fetch", "process"):
         raise ValueError(f"unknown mode {mode}")
     state = BackfillState(storage, job_id)
     model_cache = None
+    sink: timeseries.ShardBuffer | None = None
     if mode == "process":
         from .live import ModelCache
 
         model_cache = ModelCache(storage, Path(tempfile.mkdtemp(prefix="models-")))
+        sink = timeseries.ShardBuffer(storage)
     deadline = time.monotonic() + max_minutes * 60.0
     # No wait, retry or poll continues past this: the slice must end before the job timeout.
     hard_deadline = deadline + grace_minutes * 60.0
@@ -149,7 +157,9 @@ def run_backfill(
         if mode == "process":
             from .live import process_timestamp
 
-            r = process_timestamp(client, storage, sat, t, model_cache, out_dir, force=force)
+            r = process_timestamp(
+                client, storage, sat, t, model_cache, out_dir, force=force, rows_sink=sink
+            )
             info = {"ok": bool(r.get("ok")), "platform": r.get("platform"), "model": r.get("model")}
             if r.get("skipped"):
                 info["skipped"] = r["skipped"]
@@ -181,6 +191,22 @@ def run_backfill(
         _cleanup(out_dir)
         return ts, info
 
+    unflushed: list[tuple[str, dict[str, Any]]] = []  # processed, rows not yet written
+    last_flush = time.monotonic()
+
+    def flush() -> None:
+        nonlocal last_flush
+        if sink is None:
+            return
+        written = sink.flush()
+        for ts_, info_ in unflushed:
+            state.mark_done(ts_, info_)
+        if unflushed or written:
+            log.info("flushed %d shards, %d timestamps done", len(written), len(unflushed))
+        unflushed.clear()
+        state.save()
+        last_flush = time.monotonic()
+
     abandoned = 0
     pool = ThreadPoolExecutor(max_workers=concurrency)
     try:
@@ -209,11 +235,21 @@ def run_backfill(
                 except Exception:  # unexpected crash in worker
                     log.exception("backfill worker crashed")
                     continue
-                if info.get("ok"):
-                    state.mark_done(ts, info)
-                else:
+                if not info.get("ok"):
                     state.mark_failed(ts, str(info.get("errors")))
+                elif sink is not None and not info.get("skipped"):
+                    unflushed.append((ts, info))  # done once its rows are written
+                else:
+                    state.mark_done(ts, info)
                 processed += 1
+                if unflushed and (
+                    len(unflushed) >= flush_every or time.monotonic() - last_flush >= flush_seconds
+                ):
+                    try:
+                        flush()
+                    except Exception:  # keep the rows buffered and try again later
+                        log.exception("flushing time series rows failed; will retry")
+                        last_flush = time.monotonic()
                 if processed % save_every == 0:
                     state.save()
                     log.info(
@@ -231,6 +267,11 @@ def run_backfill(
         log.warning("hard deadline reached with %d timestamps in flight; abandoning", abandoned)
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
+
+    try:
+        flush()
+    except Exception:  # rows stay unwritten; their timestamps are re-made next run
+        log.exception("final flush of time series rows failed")
 
     state.data["runs"].append(
         {

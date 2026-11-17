@@ -62,12 +62,22 @@ def process_timestamp(
     out_dir: Path,
     *,
     force: bool = False,
+    rows_sink: timeseries.ShardBuffer | None = None,
 ) -> dict[str, Any]:
-    """Fetch (or reuse) the cutouts, apply the model, write products and time series rows."""
+    """Fetch (or reuse) the cutouts, apply the model, write products and time series rows.
+
+    With `rows_sink` the rows are added to that buffer (the caller flushes it) instead of
+    being written to their shards straight away, and a timestamp whose products exist is
+    only skipped if its rows are in the shards too, so rows lost to an interrupted run
+    before a flush are re-made.
+    """
     result: dict[str, Any] = {"sat": sat["key"], "time": t.isoformat(), "ok": False}
     if not force and product_exists(storage, sat, t):
-        result.update(ok=True, skipped="exists")
-        return result
+        regions_ = sat.get("monitoring_regions", [])
+        if rows_sink is None or all(rows_sink.has(sat["key"], r, t) for r in regions_):
+            result.update(ok=True, skipped="exists")
+            return result
+        log.info("%s %s: products exist but rows are missing; re-making", sat["key"], t)
     report = pipeline.fetch_timestamp(client, storage, sat, t, out_dir, summarise=False)
     result["fetch_ok"] = report["ok"]
     if "error" in report["products"].get("l15", {}):
@@ -95,7 +105,7 @@ def process_timestamp(
                 sat, t, fs.platform, model_id, region, mask, images, fs, arrays["flags"]
             )
         )
-    shards = timeseries.upsert_rows(storage, rows)
+    shards = rows_sink.add(rows) if rows_sink is not None else timeseries.upsert_rows(storage, rows)
     result.update(
         ok=True, platform=fs.platform, model=model_id, products=written, rows=rows, shards=shards
     )

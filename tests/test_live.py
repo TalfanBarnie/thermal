@@ -34,7 +34,8 @@ class FakeExists:
     """Bucket.exists for the FakeClient (which has no head_object)."""
 
 
-def test_process_timestamp_end_to_end(tmp_path, monkeypatch):
+def _process_setup(tmp_path):
+    """Fake buckets holding a trained model and a hot cutout for 2024-03-16T22:00Z."""
     sat = config.satellite("msg-0deg")
     storage = FakeStorage()
     objects = storage.private._client.objects
@@ -66,6 +67,11 @@ def test_process_timestamp_end_to_end(tmp_path, monkeypatch):
     objects[raw_key("msg-0deg", t, "l15")] = hot.read_bytes()
 
     cache = live.ModelCache(storage, tmp_path / "models")
+    return sat, storage, objects, t, cache
+
+
+def test_process_timestamp_end_to_end(tmp_path, monkeypatch):
+    sat, storage, objects, t, cache = _process_setup(tmp_path)
     result = live.process_timestamp(None, storage, sat, t, cache, tmp_path / "work")
     assert result["ok"], result
     assert result["platform"] == "MSG3" and result["model"] == "ridge_test"
@@ -138,3 +144,28 @@ def test_process_timestamp_uses_fresh_fetch_paths(tmp_path, monkeypatch):
     result = live.process_timestamp(None, storage, sat, t, cache, tmp_path / "work")
     assert result["ok"], result
     assert result["rows"][0]["n_cloud_unknown"] == result["rows"][0]["n_valid"]  # no cloud mask
+
+
+def test_process_timestamp_remakes_rows_lost_before_a_flush(tmp_path):
+    sat, storage, objects, t, cache = _process_setup(tmp_path)
+    key = "timeseries/msg-0deg/reykjanes/2024-03.jsonl"
+    buf = timeseries.ShardBuffer(storage)
+    first = live.process_timestamp(None, storage, sat, t, cache, tmp_path / "w1", rows_sink=buf)
+    assert first["ok"] and not first.get("skipped")
+    assert key not in objects  # rows wait for the flush
+    buf.flush()
+    assert len(timeseries.read_shard(storage, key)) == 1
+
+    # products and rows present: skipped
+    again = live.process_timestamp(
+        None, storage, sat, t, cache, tmp_path / "w2", rows_sink=timeseries.ShardBuffer(storage)
+    )
+    assert again.get("skipped") == "exists"
+
+    # products present but the row lost (a run interrupted before its flush): re-made
+    timeseries.write_shard(storage, key, [])
+    buf3 = timeseries.ShardBuffer(storage)
+    redo = live.process_timestamp(None, storage, sat, t, cache, tmp_path / "w3", rows_sink=buf3)
+    assert redo["ok"] and not redo.get("skipped")
+    buf3.flush()
+    assert len(timeseries.read_shard(storage, key)) == 1

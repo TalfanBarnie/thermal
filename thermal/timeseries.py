@@ -4,6 +4,7 @@ bucket, plus the index.json the web app reads first."""
 from __future__ import annotations
 
 import json
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
@@ -105,6 +106,59 @@ def upsert_rows(storage: Storage, rows: list[dict[str, Any]]) -> list[str]:
         write_shard(storage, key, [existing[k] for k in sorted(existing)])
         written.append(key)
     return written
+
+
+class ShardBuffer:
+    """Monthly shards read once per run, merged in memory and written back on flush().
+
+    upsert_rows() reads and rewrites a whole monthly shard for every timestamp, which is
+    quadratic in the month's length; at a 5 minute cadence a busy month has about 9,000
+    rows. A batch run instead adds rows here and flushes every few minutes, so each
+    month is written once per flush. The buffer must be the shards' only writer while it
+    is in use: process-mode runs share the `live` concurrency group for that reason.
+    """
+
+    def __init__(self, storage: Storage):
+        self.storage = storage
+        self._shards: dict[str, dict[str, dict[str, Any]]] = {}
+        self._dirty: set[str] = set()
+        self._lock = threading.Lock()
+
+    def _shard(self, key: str) -> dict[str, dict[str, Any]]:
+        if key not in self._shards:
+            self._shards[key] = {r["time"]: r for r in read_shard(self.storage, key)}
+        return self._shards[key]
+
+    def has(self, sat_key: str, region: str, t: datetime) -> bool:
+        """Whether the shard already holds the row for this time."""
+        with self._lock:
+            return t.strftime("%Y-%m-%dT%H:%M:%SZ") in self._shard(shard_key(sat_key, region, t))
+
+    def add(self, rows: list[dict[str, Any]]) -> list[str]:
+        """Merge rows (replacing rows with the same time). Returns the shard keys touched."""
+        keys = set()
+        with self._lock:
+            for r in rows:
+                t = datetime.strptime(r["time"], "%Y-%m-%dT%H:%M:%SZ")
+                key = shard_key(r["sat"], r["region"], t)
+                self._shard(key)[r["time"]] = r
+                self._dirty.add(key)
+                keys.add(key)
+        return sorted(keys)
+
+    @property
+    def dirty(self) -> int:
+        return len(self._dirty)
+
+    def flush(self) -> list[str]:
+        """Write every shard changed since the last flush. Returns the keys written."""
+        with self._lock:
+            written = sorted(self._dirty)
+            for key in written:
+                rows = self._shards[key]
+                write_shard(self.storage, key, [rows[k] for k in sorted(rows)])
+                self._dirty.discard(key)
+        return written
 
 
 def build_index(storage: Storage, sources: dict[str, dict[str, Any]]) -> dict[str, Any]:

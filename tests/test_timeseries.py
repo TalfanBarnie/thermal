@@ -78,3 +78,45 @@ def test_build_index_lists_months(monkeypatch):
     )
     assert index["sources"]["msg-0deg"]["regions"]["reykjanes"]["months"] == ["2024-03", "2024-05"]
     assert storage.public.get_json("index.json")["sources"]["msg-0deg"]["cadence_minutes"] == 15
+
+
+def test_shard_buffer_reads_each_month_once_and_writes_on_flush():
+    from datetime import UTC, datetime
+
+    from tests.test_backfill import FakeStorage
+    from thermal import timeseries
+
+    storage = FakeStorage()
+    client = storage.public._client
+    timeseries.write_shard(
+        storage,
+        "timeseries/msg-rss/reykjanes/2024-03.jsonl",
+        [{"time": "2024-03-01T00:00:00Z", "sat": "msg-rss", "region": "reykjanes", "v": 0}],
+    )
+    reads, writes = [], []
+    get, put = client.get_object, client.put_object
+    client.get_object = lambda **kw: (reads.append(kw["Key"]), get(**kw))[1]
+    client.put_object = lambda **kw: (writes.append(kw["Key"]), put(**kw))[1]
+
+    buf = timeseries.ShardBuffer(storage)
+    for day in range(2, 8):
+        month = 3 if day < 6 else 4
+        buf.add(
+            [
+                {
+                    "time": f"2024-{month:02d}-{day:02d}T00:00:00Z",
+                    "sat": "msg-rss",
+                    "region": "reykjanes",
+                    "v": day,
+                }
+            ]
+        )
+    assert writes == [] and buf.dirty == 2
+    assert sorted(set(reads)) == sorted(reads)  # each month read once
+    assert buf.has("msg-rss", "reykjanes", datetime(2024, 3, 3, tzinfo=UTC))
+    assert not buf.has("msg-rss", "reykjanes", datetime(2024, 3, 9, tzinfo=UTC))
+    written = buf.flush()
+    assert len(written) == 2 and buf.dirty == 0 and len(writes) == 2
+    march = timeseries.read_shard(storage, "timeseries/msg-rss/reykjanes/2024-03.jsonl")
+    assert [r["time"][:10] for r in march] == [f"2024-03-0{d}" for d in range(1, 6)]
+    assert buf.flush() == []  # nothing new to write

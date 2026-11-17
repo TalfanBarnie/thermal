@@ -880,6 +880,14 @@ Steps, in order:
    for the native images, and the products step overlays mask and image
    pixel for pixel. The products step now also aligns any mask of a different
    shape by coordinates (or treats it as unavailable) instead of failing.
+   Also done 2026-11-17: process-mode backfills write time series rows through
+   `timeseries.ShardBuffer`, which reads each monthly shard once per run and
+   writes changed shards every 100 timestamps or 5 minutes and at the end,
+   instead of a full read and rewrite of the month for every timestamp (which
+   grows quadratically with a month's length, about 9,000 rows a month at 5
+   minute cadence). A timestamp is marked done only after its rows are
+   written, and one whose products exist but whose rows are missing is
+   re-made, so an interrupted run loses nothing.
 2. Fetch the Meteosat-11 RSS training set: `backfill.yml` with sat
    `msg-rss`, job_id `rss-msg4-train`, list
    `data/samples/msg-rss_msg4_train.csv`, mode fetch, chain true. The
