@@ -209,3 +209,47 @@ def test_place_on_image_grid_adopts_the_image_projection(tmp_path):
     np.testing.assert_array_equal(ox, x)
     np.testing.assert_array_equal(oy, y)
     assert proj == {"h": H, "lon_0": 9.5, "a": A, "b": B}
+
+
+def _fake_native(tmp_path, calls, source="satpy seviri_l1b_native, cropped locally"):
+    def fake(client, sat, t, coll_id, roi, out_dir, entry, *a, kind="l15", image_nc=None, **k):
+        calls.append(kind)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"{kind}-fresh.nc"
+        xr.Dataset({"v": ("x", [1.0])}, attrs={"source": source}).to_netcdf(path)
+        return path
+
+    return fake
+
+
+def test_native_cutouts_are_stored_and_stale_ones_replaced(tmp_path, monkeypatch):
+    from tests.test_backfill import FakeStorage
+    from thermal import pipeline
+    from thermal.storage import raw_key
+
+    storage = FakeStorage()
+    sat = config.satellite("msg-rss")
+    t = datetime(2024, 11, 21, 1, tzinfo=UTC)
+    calls = []
+    monkeypatch.setattr(pipeline, "_native_with_retries", _fake_native(tmp_path, calls))
+    assert not pipeline.already_stored(storage, sat, t)  # never decided from keys alone
+
+    # a Data Tailor-era cutout already sits under the image key
+    stale = tmp_path / "stale.nc"
+    xr.Dataset({"v": ("x", [0.0])}, attrs={"source": "EPCT"}).to_netcdf(stale)
+    storage.private.put_file(raw_key("msg-rss", t, "l15"), stale)
+
+    report = pipeline.fetch_timestamp(None, storage, sat, t, tmp_path / "a", summarise=False)
+    assert report["ok"] and calls == ["l15", "clm"]
+    assert report["products"]["l15"]["replaced_stale"] == raw_key("msg-rss", t, "l15")
+    for kind in ("l15", "clm"):
+        assert report["products"][kind]["stored_key"] == raw_key("msg-rss", t, kind)
+        got = tmp_path / f"got-{kind}.nc"
+        storage.private.get_file(raw_key("msg-rss", t, kind), got)
+        assert pipeline.is_native_cutout(got)
+
+    # the stored native cutouts are now reused without touching the Data Store
+    calls.clear()
+    report = pipeline.fetch_timestamp(None, storage, sat, t, tmp_path / "b", summarise=False)
+    assert report["ok"] and calls == []
+    assert "reused_key" in report["products"]["l15"]

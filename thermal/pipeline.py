@@ -36,9 +36,64 @@ def quicklook_variables(sat: dict[str, Any]) -> list[str]:
     return [inv[ch] for ch in channels if ch in inv]
 
 
+def is_native_cutout(path: Path) -> bool:
+    """True for a cutout cropped locally from the native file (see thermal.native)."""
+    import xarray as xr
+
+    try:
+        with xr.open_dataset(path, decode_times=False) as ds:
+            return "cropped locally" in str(ds.attrs.get("source", ""))
+    except Exception:  # unreadable: treat as stale so that it is fetched again
+        return False
+
+
 def already_stored(storage: Storage, sat: dict[str, Any], t: datetime, cloudmask=True) -> bool:
+    """Every cutout is in the bucket. For natively cropped sources this is not decided
+    from the key alone (older Data Tailor cutouts may sit under the same key), so it is
+    False and the fetch itself checks, and reuses, what is stored."""
+    if any(sat.get(f"{k}_method") == "native" for k, _, _ in kinds_for(sat, cloudmask)):
+        return False
     return all(
         storage.private.exists(raw_key(sat["key"], t, k)) for k, _, _ in kinds_for(sat, cloudmask)
+    )
+
+
+def _fetch_fresh(
+    client: Any,
+    sat: dict[str, Any],
+    t: datetime,
+    kind: str,
+    coll_id: str,
+    tailor_product: str,
+    roi: list[float],
+    out_dir: Path,
+    entry: dict[str, Any],
+    retries: int,
+    retry_wait_s: float,
+    *,
+    deadline: float | None = None,
+    image_nc: Path | None = None,
+) -> Path:
+    """Make one cutout from the Data Store: cropped locally from the native file, or
+    through the Data Tailor, as configured for the source and kind."""
+    if sat.get(f"{kind}_method") == "native":
+        entry["method"] = "native"
+        return _native_with_retries(
+            client,
+            sat,
+            t,
+            coll_id,
+            roi,
+            out_dir,
+            entry,
+            retries,
+            retry_wait_s,
+            deadline=deadline,
+            kind=kind,
+            image_nc=image_nc,
+        )
+    return _tailor_with_retries(
+        client, sat, t, coll_id, tailor_product, roi, out_dir, entry, retries, retry_wait_s
     )
 
 
@@ -84,29 +139,27 @@ def fetch_timestamp(
             if storage is not None and not force and storage.private.exists(key):
                 nc_path = out_dir / kind / key.rsplit("/", 1)[-1]
                 storage.private.get_file(key, nc_path)
-                entry["reused_key"] = key
-                log.info("%s %s: reusing %s", sat["key"], t.isoformat(), key)
-            elif sat.get(f"{kind}_method") == "native":
-                entry["method"] = "native"
-                nc_path = _native_with_retries(
+                if sat.get(f"{kind}_method") == "native" and not is_native_cutout(nc_path):
+                    # stored before the native route (e.g. a mis-georeferenced Data
+                    # Tailor RSS cutout): fetch it again, overwriting the stored one
+                    log.warning(
+                        "%s %s: stored %s predates the native route; fetching again",
+                        sat["key"],
+                        t.isoformat(),
+                        key,
+                    )
+                    entry["replaced_stale"] = key
+                    nc_path.unlink(missing_ok=True)
+                    nc_path = None
+                else:
+                    entry["reused_key"] = key
+                    log.info("%s %s: reusing %s", sat["key"], t.isoformat(), key)
+            if nc_path is None:
+                nc_path = _fetch_fresh(
                     client,
                     sat,
                     t,
-                    coll_id,
-                    roi,
-                    out_dir / kind,
-                    entry,
-                    retries,
-                    retry_wait_s,
-                    deadline=deadline,
-                    kind=kind,
-                    image_nc=local_paths.get("l15"),
-                )
-            else:
-                nc_path = _tailor_with_retries(
-                    client,
-                    sat,
-                    t,
+                    kind,
                     coll_id,
                     tailor_product,
                     roi,
@@ -114,6 +167,8 @@ def fetch_timestamp(
                     entry,
                     retries,
                     retry_wait_s,
+                    deadline=deadline,
+                    image_nc=local_paths.get("l15"),
                 )
                 if storage is not None:
                     storage.private.put_file(key, nc_path, content_type="application/x-netcdf")

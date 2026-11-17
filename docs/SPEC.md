@@ -908,6 +908,27 @@ Steps, in order:
    a simple cloud test from the RSS channels themselves. The RSS cloud mask is
    still fetched: it costs about 3 s and covers the rest of the box (for
    example Holuhraun).
+   Step 6 check (2026-11-17): `thermal process --sat msg-rss --model-sat msg-0deg
+   --dry-run` (workflow process-one, inputs model_sat and dry_run) pushed two
+   timestamps through the whole chain with the 0 deg MSG4 model, keeping every
+   write on the runner. Reykjanes rows against the 0 deg (MSG3) rows for the same
+   times, during Sundhnúkur 7:
+
+   | time (2024-11-21) | source | n_valid | max | max_z | n_sat | VRP (GW) |
+   |---|---|---|---|---|---|---|
+   | 01:00 | RSS | 107 | 3.448 | 1587 | 2 | 21.9 |
+   | 01:00 | 0 deg | 126 | 3.450 | 1010 | 6 | 23.7 |
+   | 13:00 | RSS | 108 | 2.714 | 125 | 1 | 10.5 |
+   | 13:00 | 0 deg | 126 | 2.646 | 187 | 2 | 8.5 |
+
+   (RSS cloud is unknown, as expected.) The run found two faults, both fixed
+   before any RSS backfill: cutouts made by the native route were never
+   uploaded (the store step sat in the Data Tailor branch only), and a Data
+   Tailor-era RSS cloud mask (50 x 203) was still in the bucket and was reused.
+   A stored cutout for a native source is now reused only if it was cropped
+   locally (its `source` attribute); an older one is fetched again and
+   overwritten. `already_stored` is therefore never true for native sources,
+   so the fetch itself checks what is stored.
 2. Fetch the Meteosat-11 RSS training set: `backfill.yml` with sat
    `msg-rss`, job_id `rss-msg4-train`, list
    `data/samples/msg-rss_msg4_train.csv`, mode fetch, chain true. The

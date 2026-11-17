@@ -30,6 +30,19 @@ class FakeClient:
 
         return {"Body": io.BytesIO(self.objects[Key])}
 
+    def upload_fileobj(self, fh, Bucket, Key, ExtraArgs=None):
+        self.objects[Key] = fh.read()
+
+    def download_fileobj(self, Bucket, Key, fh):
+        fh.write(self.get_object(Bucket, Key)["Body"].read())
+
+    def head_object(self, Bucket, Key):
+        if Key not in self.objects:
+            exc = Exception("not found")
+            exc.response = {"Error": {"Code": "404"}}
+            raise exc
+        return {}
+
 
 def test_bucket_json_roundtrip():
     b = storage.Bucket(BucketCredentials("b", "k", "a"), "endpoint", client=FakeClient())
