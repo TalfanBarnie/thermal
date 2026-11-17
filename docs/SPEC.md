@@ -892,6 +892,22 @@ Steps, in order:
    detection check fetches an image natively), and `thermal fetch
    --quicklook` renders only VIS006, IR_039 and IR_108 (plus the cloud mask)
    instead of all 11 channels.
+   Step 5 check (2026-11-17, both test nights): the native cloud mask lands on
+   exactly the image grid (50 x 201, identical projection and geolocation
+   after adopting the image's projection) and agrees with the Data Tailor's
+   mask (21 November 01:00: 70% cloud, 21% clear land, 10% clear sea against
+   69%, 24% and 7%). **Finding: the MSG cloud mask product stops at a view
+   zenith angle of about 75.9 deg** (its footprint edge is at 75.9 deg at both
+   its south-western and north-eastern extremes), and from 9.5 deg E the whole
+   Reykjanes region is at 75.9 to 76.8 deg (Sundhnúkur 76.5 deg). So RSS rows
+   for Reykjanes have no cloud information (`n_cloud_unknown` = `n_valid`);
+   from 0 deg the region is at about 74.3 deg and is covered. The RSS image
+   itself is valid there. Options for RSS cloud information over Reykjanes:
+   the nearest 0 deg cloud mask (15 minute cadence, a different view so cloud
+   tops are displaced by parallax, but usable as a region-level indicator), or
+   a simple cloud test from the RSS channels themselves. The RSS cloud mask is
+   still fetched: it costs about 3 s and covers the rest of the box (for
+   example Holuhraun).
 2. Fetch the Meteosat-11 RSS training set: `backfill.yml` with sat
    `msg-rss`, job_id `rss-msg4-train`, list
    `data/samples/msg-rss_msg4_train.csv`, mode fetch, chain true. The
