@@ -287,6 +287,31 @@ def _proj_of(area: Any) -> dict[str, float]:
     return {"h": float(crs["h"]), "lon_0": float(crs.get("lon_0", 0.0)), "a": a, "b": b}
 
 
+def place_on_image_grid(
+    values: np.ndarray, x: np.ndarray, y: np.ndarray, image_nc: Path
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, float]]:
+    """Move a field onto an image cutout's grid and adopt the image's projection.
+
+    Matching on x/y is exact whatever ellipsoid each product declares, because
+    geostationary x and y are scan angles scaled by the satellite height. The result
+    carries the image's projection so that the two files geolocate identically (the
+    cloud mask GRIB declares a different ellipsoid from the level 1.5 image).
+    """
+    from . import geo
+
+    with xr.open_dataset(image_nc, decode_times=False) as img:
+        img_x = np.asarray(img["x"].values)
+        img_y = np.asarray(img["y"].values)
+        g = img["geostationary"].attrs
+        proj = {
+            "h": float(g["perspective_point_height"]),
+            "lon_0": float(g["longitude_of_projection_origin"]),
+            "a": float(g["semi_major_axis"]),
+            "b": float(g["semi_minor_axis"]),
+        }
+    return geo.nearest_on_grid(values, x, y, img_x, img_y), img_x, img_y, proj
+
+
 def crop_cloud_mask(
     grb_path: Path,
     roi_nswe: list[float],
@@ -316,11 +341,7 @@ def crop_cloud_mask(
     values[values == CLOUD_NO_DATA] = np.nan
     proj = _proj_of(area)
     if image_nc is not None:
-        with xr.open_dataset(image_nc, decode_times=False) as img:
-            img_x = np.asarray(img["x"].values)
-            img_y = np.asarray(img["y"].values)
-        values = geo.nearest_on_grid(values, x, y, img_x, img_y)
-        x, y = img_x, img_y
+        values, x, y, proj = place_on_image_grid(values, x, y, image_nc)
     ds = cloud_mask_dataset(values, x, y, proj, product_name)
     lat, lon, _ = geo.geolocate(ds)
     inside = (lat >= south) & (lat <= north) & (lon >= west) & (lon <= east)

@@ -195,3 +195,17 @@ def test_quicklooks_only_for_the_channels_we_use():
         ]
     custom = {"variable_map": {"channel_9": "IR_108"}, "quicklook_channels": ["IR_108"]}
     assert pipeline.quicklook_variables(custom) == ["channel_9"]
+
+
+def test_place_on_image_grid_adopts_the_image_projection(tmp_path):
+    image, x, y = _write(tmp_path)
+    # a mask on a slightly larger grid with its own (different) ellipsoid
+    step = x[1] - x[0]
+    mx = x[0] + (np.arange(x.size + 4) - 2) * step
+    my = y[0] - (np.arange(y.size + 2) - 1) * step
+    vals = np.arange(my.size * mx.size, dtype=float).reshape(my.size, mx.size)
+    out, ox, oy, proj = native.place_on_image_grid(vals, mx, my, image)
+    np.testing.assert_array_equal(out, vals[1:-1, 2:-2])
+    np.testing.assert_array_equal(ox, x)
+    np.testing.assert_array_equal(oy, y)
+    assert proj == {"h": H, "lon_0": 9.5, "a": A, "b": B}
