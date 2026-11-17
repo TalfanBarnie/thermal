@@ -888,6 +888,10 @@ Steps, in order:
    minute cadence). A timestamp is marked done only after its rows are
    written, and one whose products exist but whose rows are missing is
    re-made, so an interrupted run loses nothing.
+   Also done 2026-11-17: `train.yml` installs satpy for `msg-rss` (its
+   detection check fetches an image natively), and `thermal fetch
+   --quicklook` renders only VIS006, IR_039 and IR_108 (plus the cloud mask)
+   instead of all 11 channels.
 2. Fetch the Meteosat-11 RSS training set: `backfill.yml` with sat
    `msg-rss`, job_id `rss-msg4-train`, list
    `data/samples/msg-rss_msg4_train.csv`, mode fetch, chain true. The

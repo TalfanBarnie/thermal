@@ -182,3 +182,16 @@ def test_pipeline_routes_rss_cloud_mask_natively(tmp_path, monkeypatch):
     assert report["ok"]
     assert [c[0] for c in calls] == ["l15", "clm"]
     assert calls[1][1] == tmp_path / "l15.nc"  # the mask is put on the image grid
+
+
+def test_quicklooks_only_for_the_channels_we_use():
+    from thermal import pipeline
+
+    for key in ("msg-0deg", "msg-rss"):
+        assert pipeline.quicklook_variables(config.satellite(key)) == [
+            "channel_1",
+            "channel_4",
+            "channel_9",
+        ]
+    custom = {"variable_map": {"channel_9": "IR_108"}, "quicklook_channels": ["IR_108"]}
+    assert pipeline.quicklook_variables(custom) == ["channel_9"]

@@ -23,6 +23,19 @@ def kinds_for(sat: dict[str, Any], cloudmask: bool = True) -> list[tuple[str, st
     return kinds
 
 
+# Channels rendered as quicklooks by `thermal fetch --quicklook`: visible 0.6 um, the
+# 3.9 um target and the 10.8 um window channel. The other channels are not looked at,
+# so rendering them only filled the public bucket.
+QUICKLOOK_CHANNELS = ("VIS006", "IR_039", "IR_108")
+
+
+def quicklook_variables(sat: dict[str, Any]) -> list[str]:
+    """Cutout variable names of the quicklook channels (a source may override the list)."""
+    inv = {ch: var for var, ch in sat.get("variable_map", {}).items()}
+    channels = sat.get("quicklook_channels", QUICKLOOK_CHANNELS)
+    return [inv[ch] for ch in channels if ch in inv]
+
+
 def already_stored(storage: Storage, sat: dict[str, Any], t: datetime, cloudmask=True) -> bool:
     return all(
         storage.private.exists(raw_key(sat["key"], t, k)) for k, _, _ in kinds_for(sat, cloudmask)
@@ -112,7 +125,7 @@ def fetch_timestamp(
                 entry["summary"] = inspect.summarise(nc_path)
             if quicklook:
                 variables = (
-                    list(sat.get("variable_map", {}))
+                    quicklook_variables(sat)
                     if kind == "l15"
                     else [sat.get("cloudmask_variable", "cloud_mask")]
                 )

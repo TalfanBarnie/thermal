@@ -48,6 +48,9 @@ jobs:
           cache: pip
       - run: pip install -e . scikit-learn pandas
       - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: satpy for native cropping (RSS)
+        if: ${{ inputs.sat == 'msg-rss' }}
+        run: pip install -e ".[native]"
       - name: train and evaluate
         run: >
           python -m training.run --sat "${{ inputs.sat }}" --platform "${{ inputs.platform }}"
