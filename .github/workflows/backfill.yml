@@ -95,10 +95,12 @@ jobs:
           fi
           echo "remaining=$(python -c "import json;print(json.load(open('$RUNNER_TEMP/summary.json'))['remaining'])")" >> "$GITHUB_OUTPUT"
       - name: re-dispatch while work remains
-        # Runs even if the backfill step crashed or the job hit its timeout: a missing summary
-        # counts as "work remains". (A missing output is null, and null != '0' is false in
-        # GitHub expressions because both sides are coerced to the number 0.)
-        if: ${{ always() && inputs.chain && (steps.backfill.outputs.remaining || 'unknown') != '0' }}
+        # Runs even if the backfill step crashed: a missing summary counts as "work remains".
+        # (A missing output is null, and null != '0' is false in GitHub expressions because
+        # both sides are coerced to the number 0.) A cancelled run does not re-dispatch, so
+        # cancelling a run stops its chain; the backfill ends its slice well before the job
+        # timeout, which would also count as cancelled.
+        if: ${{ !cancelled() && inputs.chain && (steps.backfill.outputs.remaining || 'unknown') != '0' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
